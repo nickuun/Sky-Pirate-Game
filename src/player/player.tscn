@@ -1,0 +1,34 @@
+[gd_scene format=3 uid="uid://dpma26wj8r6te"]
+
+[ext_resource type="Script" uid="uid://b60c02go5xl8s" path="res://src/player/player.gd" id="1_4anbu"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_rxibo"]
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_mf2ua"]
+
+[node name="Player" type="CharacterBody3D" unique_id=45355869]
+collision_mask = 11
+script = ExtResource("1_4anbu")
+
+[node name="CapsuleShape3D" type="CollisionShape3D" parent="." unique_id=1096113231]
+shape = SubResource("CapsuleShape3D_rxibo")
+
+[node name="Visual" type="Node3D" parent="." unique_id=2093754896]
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Visual" unique_id=1919315678]
+mesh = SubResource("CapsuleMesh_mf2ua")
+
+[node name="CameraPivot" type="Node3D" parent="." unique_id=1014377324]
+position = Vector3(0, 1.35, 0)
+rotation = Vector3(-0.2, 0, 0)
+
+[node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot" unique_id=1020361452]
+spring_length = 4.0
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=180385261]
+position = Vector3(0.7, 0, 0)
+current = false
+fov = 80.0
+
+[node name="HoldPoint" type="Marker3D" parent="CameraPivot" unique_id=2130609945]
+position = Vector3(0.25, -0.3, -1.7)

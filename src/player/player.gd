@@ -1,0 +1,493 @@
+extends CharacterBody3D
+class_name PlayerController
+
+@export var move_speed: float = 6.0
+@export var acceleration: float = 18.0
+@export var deceleration: float = 22.0
+@export var jump_velocity: float = 5.0
+@export var gravity: float = 18.0
+
+@export var waddle_tilt_degrees: float = 8.0
+@export var waddle_bob_amount: float = 0.06
+@export var waddle_bob_speed: float = 10.0
+@export var mouse_sensitivity: float = 0.0025
+@export var min_pitch_degrees: float = -62.0
+@export var max_pitch_degrees: float = 35.0
+@export var pickup_range: float = 7.0
+@export var cargo_control_range: float = 2.0
+@export var floor_max_angle_degrees: float = 42.0
+@export var floor_snap_distance: float = 0.45
+@export var ship_latch_duration: float = 0.35
+@export var ship_probe_distance: float = 1.35
+@export var remote_pos_smooth_speed: float = 22.0
+@export var remote_rot_smooth_speed: float = 24.0
+@export var remote_pos_deadzone: float = 0.015
+@export var remote_ship_latch_duration: float = 0.45
+@export var aim_screen_offset: Vector2 = Vector2(90.0, 8.0)
+
+@onready var visual: Node3D = $Visual
+@onready var camera_pivot: Node3D = $CameraPivot
+@onready var camera: Camera3D = $CameraPivot/SpringArm3D/Camera3D
+@onready var hold_point: Marker3D = $CameraPivot/HoldPoint
+
+var _move_input: Vector2 = Vector2.ZERO
+var _waddle_time: float = 0.0
+var _yaw: float = 0.0
+var _pitch: float = 0.0
+var _held_cargo: CargoCrate = null
+var _spawn_position: Vector3 = Vector3.ZERO
+var _cargo_control_cooldown: float = 0.0
+var _driving_wheel: ShipWheel = null
+var _drive_collision_disabled: bool = false
+var _latched_ship: SkyShip = null
+var _latched_ship_transform: Transform3D = Transform3D.IDENTITY
+var _ship_latch_time_remaining: float = 0.0
+var _remote_target_position: Vector3 = Vector3.ZERO
+var _remote_target_basis: Basis = Basis.IDENTITY
+var _remote_target_velocity: Vector3 = Vector3.ZERO
+var _remote_target_visual_position: Vector3 = Vector3.ZERO
+var _remote_target_visual_basis: Basis = Basis.IDENTITY
+var _remote_latched_ship: SkyShip = null
+var _remote_latched_ship_transform: Transform3D = Transform3D.IDENTITY
+var _remote_ship_latch_time_remaining: float = 0.0
+
+func _ready() -> void:
+	add_to_group("player_controller")
+	# We apply ship follow manually to avoid double platform velocity + correction jitter.
+	platform_floor_layers = 0
+	platform_wall_layers = 0
+	floor_snap_length = floor_snap_distance
+	floor_stop_on_slope = false
+	floor_max_angle = deg_to_rad(floor_max_angle_degrees)
+	_spawn_position = global_position
+	_yaw = rotation.y
+	_pitch = camera_pivot.rotation.x
+	_remote_target_position = global_position
+	_remote_target_basis = basis
+	_remote_target_velocity = velocity
+	_remote_target_visual_position = visual.position
+	_remote_target_visual_basis = visual.basis
+	Network.server_started.connect(_on_session_started)
+	Network.connected_to_server.connect(_on_session_started)
+	Network.disconnected.connect(_on_session_ended)
+	_update_camera_state()
+	_on_session_started()
+
+func _physics_process(delta: float) -> void:
+	if not is_multiplayer_authority():
+		_apply_remote_state(delta)
+		return
+
+	_update_driving_wheel_reference()
+	_read_input()
+	_update_ship_latch_state(delta)
+	_apply_latched_ship_follow(delta)
+	if _is_driving():
+		_apply_drive_control()
+	else:
+		_apply_gravity(delta)
+		_apply_movement(delta)
+	_apply_waddle(delta)
+	_update_cargo_control_request(delta)
+	_try_interact()
+	if _is_driving():
+		_clear_ship_latch()
+		_lock_to_wheel()
+	else:
+		if velocity.y <= 0.0:
+			apply_floor_snap()
+		move_and_slide()
+		_update_ship_latch_state(0.0)
+	_update_drive_collision_state()
+
+	sync_state.rpc(global_position, basis, velocity, visual.position, visual.basis)
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PATH_RENAMED:
+		_update_camera_state()
+
+func _input(event: InputEvent) -> void:
+	if not is_multiplayer_authority():
+		return
+	if not _is_session_active():
+		return
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+
+	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
+		_yaw -= event.relative.x * mouse_sensitivity
+		_pitch = clamp(
+			_pitch - event.relative.y * mouse_sensitivity,
+			deg_to_rad(min_pitch_degrees),
+			deg_to_rad(max_pitch_degrees)
+		)
+		rotation.y = _yaw
+		camera_pivot.rotation.x = _pitch
+
+func _read_input() -> void:
+	if _is_driving():
+		_move_input = Vector2.ZERO
+		return
+	_move_input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
+
+func _apply_gravity(delta: float) -> void:
+	if not is_on_floor():
+		velocity.y -= gravity * delta
+	else:
+		velocity.y = 0.0
+
+	if Input.is_action_just_pressed("jump") and is_on_floor():
+		velocity.y = jump_velocity
+
+func _apply_movement(delta: float) -> void:
+	var cam_basis: Basis = camera.global_transform.basis
+	var forward: Vector3 = -cam_basis.z
+	forward.y = 0.0
+	forward = forward.normalized()
+	var right: Vector3 = cam_basis.x
+	right.y = 0.0
+	right = right.normalized()
+
+	var forward_input: float = -_move_input.y
+	var input_dir: Vector3 = (right * _move_input.x) + (forward * forward_input)
+	if input_dir.length() > 1.0:
+		input_dir = input_dir.normalized()
+
+	var target_vel: Vector3 = input_dir * move_speed
+	target_vel.y = velocity.y
+
+	var horiz_vel: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
+	var target_horiz: Vector3 = Vector3(target_vel.x, 0.0, target_vel.z)
+
+	var rate: float = acceleration if input_dir.length() > 0.0 else deceleration
+	var new_horiz: Vector3 = horiz_vel.lerp(target_horiz, 1.0 - exp(-rate * delta))
+
+	velocity.x = new_horiz.x
+	velocity.z = new_horiz.z
+
+func _apply_waddle(delta: float) -> void:
+	var horiz_speed: float = Vector3(velocity.x, 0.0, velocity.z).length()
+	var moving: bool = horiz_speed > 0.1
+
+	if moving:
+		_waddle_time += delta
+	else:
+		_waddle_time = 0.0
+
+	# Visual bob
+	var bob: float = 0.0
+	if moving:
+		bob = sin(_waddle_time * waddle_bob_speed) * waddle_bob_amount
+
+	var pos: Vector3 = visual.position
+	pos.y = bob
+	visual.position = pos
+
+	# Visual tilt (Fall Guys vibe but controllable)
+	var tilt_x: float = 0.0
+	var tilt_z: float = 0.0
+	if moving:
+		tilt_x = _move_input.y * deg_to_rad(waddle_tilt_degrees)
+		tilt_z = _move_input.x * deg_to_rad(waddle_tilt_degrees)
+
+	var target_basis: Basis = Basis.from_euler(Vector3(tilt_x, 0.0, tilt_z))
+	visual.basis = visual.basis.slerp(target_basis, 1.0 - exp(-14.0 * delta))
+
+func _try_interact() -> void:
+	if not Input.is_action_just_pressed("interact"):
+		return
+
+	if _is_driving():
+		if _driving_wheel != null:
+			_driving_wheel.interact(self)
+		return
+
+	if _held_cargo != null and _held_cargo.is_held_by(multiplayer.get_unique_id()):
+		_request_drop(_held_cargo)
+		_held_cargo = null
+		return
+
+	var target: Object = _get_interaction_target()
+	if target == null:
+		return
+
+	var wheel: ShipWheel = target as ShipWheel
+	if wheel != null:
+		wheel.interact(self)
+		_update_driving_wheel_reference()
+		return
+
+	var cargo: CargoCrate = target as CargoCrate
+	if cargo == null:
+		return
+
+	_request_pickup(cargo)
+	_held_cargo = cargo
+
+func _update_cargo_control_request(delta: float) -> void:
+	# Cargo is server-authoritative; no client authority handoff requests.
+	return
+
+func _request_pickup(cargo: CargoCrate) -> void:
+	if multiplayer.is_server():
+		cargo.request_pickup(hold_point.get_path())
+	else:
+		cargo.request_pickup.rpc_id(1, hold_point.get_path())
+
+func _request_drop(cargo: CargoCrate) -> void:
+	if multiplayer.is_server():
+		cargo.request_drop()
+	else:
+		cargo.request_drop.rpc_id(1)
+
+func request_respawn() -> void:
+	if not is_multiplayer_authority():
+		return
+	_respawn()
+
+func get_interaction_prompt() -> String:
+	if not is_multiplayer_authority() or not _is_session_active():
+		return ""
+	if _is_driving():
+		return "E: Leave Wheel"
+	if _held_cargo != null and _held_cargo.is_held_by(multiplayer.get_unique_id()):
+		return "E: Drop Cargo"
+
+	var target: Object = _get_interaction_target()
+	if target == null:
+		return ""
+
+	var wheel: ShipWheel = target as ShipWheel
+	if wheel != null:
+		return wheel.get_interaction_prompt(multiplayer.get_unique_id())
+
+	var cargo: CargoCrate = target as CargoCrate
+	if cargo != null:
+		return "E: Pick up Cargo"
+
+	return ""
+
+func _respawn() -> void:
+	_driving_wheel = null
+	_clear_ship_latch()
+	_clear_remote_ship_latch()
+	global_position = _spawn_position + Vector3(0.0, 1.0, 0.0)
+	velocity = Vector3.ZERO
+
+@rpc("any_peer", "unreliable", "call_remote")
+func sync_state(pos: Vector3, body_basis: Basis, body_velocity: Vector3, visual_pos: Vector3, visual_basis: Basis) -> void:
+	if is_multiplayer_authority():
+		return
+
+	_remote_target_position = pos
+	_remote_target_basis = body_basis
+	_remote_target_velocity = body_velocity
+	_remote_target_visual_position = visual_pos
+	_remote_target_visual_basis = visual_basis
+
+func _update_camera_state() -> void:
+	if camera == null:
+		return
+	camera.current = is_multiplayer_authority()
+
+func _on_session_started() -> void:
+	if camera.current and _is_session_active():
+		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+	_update_driving_wheel_reference()
+
+func _on_session_ended() -> void:
+	if camera.current:
+		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
+	_driving_wheel = null
+	_clear_ship_latch()
+	_clear_remote_ship_latch()
+
+func _is_session_active() -> bool:
+	return Network.session_active
+
+func _get_interaction_target() -> Object:
+	var viewport: Viewport = get_viewport()
+	if viewport == null:
+		return null
+
+	var aim_pos: Vector2 = get_aim_screen_position()
+	var from: Vector3 = camera.project_ray_origin(aim_pos)
+	var to: Vector3 = from + (camera.project_ray_normal(aim_pos) * pickup_range)
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
+	query.collide_with_areas = true
+	query.collide_with_bodies = true
+	query.exclude = [get_rid()]
+	var result: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if result.is_empty():
+		return null
+	return result.get("collider")
+
+func get_aim_screen_position() -> Vector2:
+	var viewport: Viewport = get_viewport()
+	if viewport == null:
+		return Vector2.ZERO
+	var size: Vector2 = viewport.get_visible_rect().size
+	return (size * 0.5) + aim_screen_offset
+
+func _is_driving() -> bool:
+	if _driving_wheel == null:
+		return false
+	var ship: SkyShip = _driving_wheel.ship
+	if ship == null:
+		return false
+	return ship.is_driver(multiplayer.get_unique_id())
+
+func _update_driving_wheel_reference() -> void:
+	_driving_wheel = null
+	var wheels: Array[Node] = get_tree().get_nodes_in_group("ship_wheel")
+	for node: Node in wheels:
+		var wheel: ShipWheel = node as ShipWheel
+		if wheel != null and wheel.ship.is_driver(multiplayer.get_unique_id()):
+			_driving_wheel = wheel
+			return
+
+func _apply_drive_control() -> void:
+	if _driving_wheel == null:
+		return
+	var ship: SkyShip = _driving_wheel.ship
+	if ship == null:
+		return
+
+	# A/D steer yaw. W/S pitch nose up/down.
+	var turn_input: float = Input.get_axis("move_left", "move_right")
+	var pitch_input: float = Input.get_axis("move_back", "move_forward")
+	ship.submit_driver_input(turn_input, pitch_input)
+
+func _lock_to_wheel() -> void:
+	if _driving_wheel == null:
+		return
+	var anchor: Marker3D = _driving_wheel.get_driver_anchor()
+	if anchor == null:
+		return
+	global_position = anchor.global_position
+	velocity = Vector3.ZERO
+
+func _update_drive_collision_state() -> void:
+	var should_disable: bool = _is_driving()
+	if should_disable == _drive_collision_disabled:
+		return
+
+	# Toggle collision against ship layer while driving to avoid feedback explosion.
+	set_collision_mask_value(4, not should_disable)
+	_drive_collision_disabled = should_disable
+
+func _apply_remote_state(delta: float) -> void:
+	_update_remote_ship_latch_state(delta)
+	_apply_remote_ship_follow_prediction()
+
+	var pos_alpha: float = min(1.0, delta * remote_pos_smooth_speed)
+	var rot_alpha: float = min(1.0, delta * remote_rot_smooth_speed)
+
+	var pos_error: Vector3 = _remote_target_position - global_position
+	if pos_error.length() > remote_pos_deadzone:
+		global_position = global_position.lerp(_remote_target_position, pos_alpha)
+
+	basis = basis.orthonormalized().slerp(_remote_target_basis.orthonormalized(), rot_alpha)
+	velocity = _remote_target_velocity
+	visual.position = visual.position.lerp(_remote_target_visual_position, pos_alpha)
+	visual.basis = visual.basis.orthonormalized().slerp(_remote_target_visual_basis.orthonormalized(), rot_alpha)
+
+func _apply_latched_ship_follow(delta: float) -> void:
+	if _is_driving():
+		_clear_ship_latch()
+		return
+	if _latched_ship == null or not is_instance_valid(_latched_ship):
+		_clear_ship_latch()
+		return
+	if _ship_latch_time_remaining <= 0.0:
+		_clear_ship_latch()
+		return
+
+	var current_ship_transform: Transform3D = _latched_ship.global_transform
+	var ship_delta: Transform3D = current_ship_transform * _latched_ship_transform.affine_inverse()
+	global_position = ship_delta * global_position
+
+	_latched_ship_transform = current_ship_transform
+
+func _update_ship_latch_state(delta: float) -> void:
+	if _is_driving():
+		_clear_ship_latch()
+		return
+
+	var ship: SkyShip = _probe_ship_below()
+	if ship == null:
+		if _latched_ship == null:
+			return
+		_ship_latch_time_remaining = max(0.0, _ship_latch_time_remaining - delta)
+		if _ship_latch_time_remaining <= 0.0:
+			_clear_ship_latch()
+		return
+
+	if _latched_ship == null or _latched_ship != ship:
+		_latched_ship = ship
+		_latched_ship_transform = ship.global_transform
+	_latched_ship = ship
+	_ship_latch_time_remaining = ship_latch_duration
+
+func _clear_ship_latch() -> void:
+	_latched_ship = null
+	_ship_latch_time_remaining = 0.0
+
+func _probe_ship_below() -> SkyShip:
+	var from: Vector3 = global_position + Vector3.UP * 0.2
+	var to: Vector3 = from + (Vector3.DOWN * ship_probe_distance)
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	query.exclude = [get_rid()]
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return null
+	return hit.get("collider") as SkyShip
+
+func _update_remote_ship_latch_state(delta: float) -> void:
+	var ship: SkyShip = _probe_ship_below_at(_remote_target_position)
+	if ship == null:
+		ship = _probe_ship_below_at(global_position)
+
+	if ship == null:
+		if _remote_latched_ship == null:
+			return
+		_remote_ship_latch_time_remaining = max(0.0, _remote_ship_latch_time_remaining - delta)
+		if _remote_ship_latch_time_remaining <= 0.0:
+			_clear_remote_ship_latch()
+		return
+
+	if _remote_latched_ship == null or _remote_latched_ship != ship:
+		_remote_latched_ship = ship
+		_remote_latched_ship_transform = ship.global_transform
+	_remote_ship_latch_time_remaining = remote_ship_latch_duration
+
+func _apply_remote_ship_follow_prediction() -> void:
+	if _remote_latched_ship == null or not is_instance_valid(_remote_latched_ship):
+		return
+	if _remote_ship_latch_time_remaining <= 0.0:
+		return
+
+	var current_ship_transform: Transform3D = _remote_latched_ship.global_transform
+	var ship_delta: Transform3D = current_ship_transform * _remote_latched_ship_transform.affine_inverse()
+	global_position = ship_delta * global_position
+	_remote_target_position = ship_delta * _remote_target_position
+	_remote_latched_ship_transform = current_ship_transform
+
+func _clear_remote_ship_latch() -> void:
+	_remote_latched_ship = null
+	_remote_ship_latch_time_remaining = 0.0
+
+func _probe_ship_below_at(sample_position: Vector3) -> SkyShip:
+	var from: Vector3 = sample_position + Vector3.UP * 0.2
+	var to: Vector3 = from + (Vector3.DOWN * ship_probe_distance)
+	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
+	query.collide_with_areas = false
+	query.collide_with_bodies = true
+	query.exclude = [get_rid()]
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return null
+	return hit.get("collider") as SkyShip

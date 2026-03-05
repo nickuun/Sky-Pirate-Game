@@ -1,0 +1,75 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://src/ui/ui_net.gd" id="1_w4sg8"]
+
+[node name="UINet" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+script = ExtResource("1_w4sg8")
+
+[node name="Panel" type="PanelContainer" parent="."]
+layout_mode = 0
+offset_left = 18.0
+offset_top = 17.0
+offset_right = 342.0
+offset_bottom = 334.0
+
+[node name="Margin" type="MarginContainer" parent="Panel"]
+layout_mode = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="VBox" type="VBoxContainer" parent="Panel/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="Title" type="Label" parent="Panel/Margin/VBox"]
+layout_mode = 2
+text = "Sky Pirate Session"
+
+[node name="Buttons" type="HBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="SingleplayerButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Singleplayer"
+
+[node name="HostButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Host"
+
+[node name="RefreshButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "Refresh"
+
+[node name="HostsList" type="ItemList" parent="Panel/Margin/VBox"]
+custom_minimum_size = Vector2(0, 140)
+layout_mode = 2
+
+[node name="JoinRow" type="HBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="IPInput" type="LineEdit" parent="Panel/Margin/VBox/JoinRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+placeholder_text = "Type IP if no list entry..."
+
+[node name="JoinButton" type="Button" parent="Panel/Margin/VBox/JoinRow"]
+layout_mode = 2
+text = "Join"
+
+[node name="Status" type="Label" parent="Panel/Margin/VBox"]
+layout_mode = 2
+autowrap_mode = 3
+text = "Pick singleplayer or host/join LAN."
