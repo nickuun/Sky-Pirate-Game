@@ -365,7 +365,7 @@ func _apply_drive_control() -> void:
 	if ship == null:
 		return
 
-	# A/D steer yaw. W/S pitch nose up/down.
+	# A/D steer yaw. W pitches nose down, S pitches nose up.
 	var turn_input: float = Input.get_axis("move_left", "move_right")
 	var pitch_input: float = Input.get_axis("move_back", "move_forward")
 	ship.submit_driver_input(turn_input, pitch_input)

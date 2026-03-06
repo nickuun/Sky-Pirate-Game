@@ -3,7 +3,8 @@ class_name SkyShip
 
 @export var cruise_speed: float = 5.2
 @export var turn_speed_degrees: float = 24.0
-@export var climb_speed: float = 2.4
+@export var pitch_speed_degrees: float = 18.0
+@export var max_pitch_degrees: float = 28.0
 @export var min_flight_altitude: float = -2.0
 @export var idle_gravity_scale: float = 0.15
 @export var sync_lerp_speed: float = 16.0
@@ -19,16 +20,17 @@ var _sync_transform: Transform3D
 var _sync_linear_velocity: Vector3 = Vector3.ZERO
 var _sync_angular_velocity: Vector3 = Vector3.ZERO
 var _spawn_transform: Transform3D
-var _drive_altitude: float = 0.0
 var _drive_yaw: float = 0.0
+var _drive_pitch: float = 0.0
 var _driver_turn_input: float = 0.0
 var _driver_pitch_input: float = 0.0
 
 func _ready() -> void:
 	_sync_transform = global_transform
 	_spawn_transform = global_transform
-	_drive_altitude = global_position.y
-	_drive_yaw = global_basis.get_euler().y
+	var euler: Vector3 = global_basis.get_euler()
+	_drive_yaw = euler.y
+	_drive_pitch = euler.x
 	set_multiplayer_authority(1)
 	can_sleep = false
 	add_to_group("sky_ship")
@@ -95,8 +97,9 @@ func set_driver_peer(peer_id: int) -> void:
 	var had_driver: bool = driver_peer_id != 0
 	driver_peer_id = peer_id
 	if driver_peer_id != 0 and not had_driver:
-		_drive_altitude = global_position.y
-		_drive_yaw = global_basis.get_euler().y
+		var euler: Vector3 = global_basis.get_euler()
+		_drive_yaw = euler.y
+		_drive_pitch = euler.x
 		_driver_turn_input = 0.0
 		_driver_pitch_input = 0.0
 		linear_velocity = Vector3.ZERO
@@ -124,26 +127,29 @@ func _run_authoritative_sim(delta: float) -> void:
 	if driver_peer_id != 0:
 		gravity_scale = 0.0
 		freeze = true
+		var previous_pitch: float = _drive_pitch
 		var previous_yaw: float = _drive_yaw
 		_drive_yaw += deg_to_rad(turn_speed_degrees) * _driver_turn_input * delta
-		_drive_altitude += climb_speed * _driver_pitch_input * delta
-		_drive_altitude = max(_drive_altitude, min_flight_altitude)
+		# W (+1) pitches nose down. S (-1) pitches nose up.
+		_drive_pitch -= deg_to_rad(pitch_speed_degrees) * _driver_pitch_input * delta
+		_drive_pitch = clamp(_drive_pitch, deg_to_rad(-max_pitch_degrees), deg_to_rad(max_pitch_degrees))
 
 		var previous_position: Vector3 = global_position
-		var yaw_basis: Basis = Basis.from_euler(Vector3(0.0, _drive_yaw, 0.0))
-		global_basis = yaw_basis
+		var drive_basis: Basis = Basis.from_euler(Vector3(_drive_pitch, _drive_yaw, 0.0))
+		global_basis = drive_basis
 
-		var fwd: Vector3 = -yaw_basis.z
-		fwd.y = 0.0
+		var fwd: Vector3 = -drive_basis.z
 		if fwd.length() > 0.001:
 			fwd = fwd.normalized()
 		var next_position: Vector3 = previous_position + (fwd * cruise_speed * delta)
-		next_position.y = _drive_altitude
+		next_position.y = max(next_position.y, min_flight_altitude)
 		global_position = next_position
 		linear_velocity = (global_position - previous_position) / max(0.0001, delta)
+		var pitch_delta: float = wrapf(_drive_pitch - previous_pitch, -PI, PI)
 		var yaw_delta: float = wrapf(_drive_yaw - previous_yaw, -PI, PI)
+		var pitch_rate: float = pitch_delta / max(0.0001, delta)
 		var yaw_rate: float = yaw_delta / max(0.0001, delta)
-		angular_velocity = Vector3.UP * yaw_rate
+		angular_velocity = (global_basis.x * pitch_rate) + (Vector3.UP * yaw_rate)
 	else:
 		freeze = false
 		gravity_scale = idle_gravity_scale
@@ -177,8 +183,9 @@ func sync_state(next_transform: Transform3D, next_linear_velocity: Vector3, next
 
 func _respawn_ship() -> void:
 	global_transform = _spawn_transform
-	_drive_altitude = global_position.y
-	_drive_yaw = global_basis.get_euler().y
+	var euler: Vector3 = global_basis.get_euler()
+	_drive_yaw = euler.y
+	_drive_pitch = euler.x
 	_driver_turn_input = 0.0
 	_driver_pitch_input = 0.0
 	freeze = false
