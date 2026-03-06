@@ -19,10 +19,10 @@ class_name PlayerController
 @export var floor_snap_distance: float = 0.45
 @export var ship_latch_duration: float = 0.35
 @export var ship_probe_distance: float = 1.35
+@export var ship_deck_area_mask: int = 16
 @export var remote_pos_smooth_speed: float = 22.0
 @export var remote_rot_smooth_speed: float = 24.0
 @export var remote_pos_deadzone: float = 0.015
-@export var remote_ship_latch_duration: float = 0.45
 @export var aim_screen_offset: Vector2 = Vector2(90.0, 8.0)
 
 @onready var visual: Node3D = $Visual
@@ -47,9 +47,9 @@ var _remote_target_basis: Basis = Basis.IDENTITY
 var _remote_target_velocity: Vector3 = Vector3.ZERO
 var _remote_target_visual_position: Vector3 = Vector3.ZERO
 var _remote_target_visual_basis: Basis = Basis.IDENTITY
-var _remote_latched_ship: SkyShip = null
-var _remote_latched_ship_transform: Transform3D = Transform3D.IDENTITY
-var _remote_ship_latch_time_remaining: float = 0.0
+var _remote_target_on_ship: bool = false
+var _remote_target_ship_rel_position: Vector3 = Vector3.ZERO
+var _remote_target_ship_rel_basis: Basis = Basis.IDENTITY
 
 func _ready() -> void:
 	add_to_group("player_controller")
@@ -100,7 +100,14 @@ func _physics_process(delta: float) -> void:
 		_update_ship_latch_state(0.0)
 	_update_drive_collision_state()
 
-	sync_state.rpc(global_position, basis, velocity, visual.position, visual.basis)
+	var support_ship: SkyShip = _get_sync_support_ship()
+	var on_ship: bool = support_ship != null
+	var rel_position: Vector3 = Vector3.ZERO
+	var rel_basis: Basis = Basis.IDENTITY
+	if on_ship:
+		rel_position = support_ship.to_local(global_position)
+		rel_basis = (support_ship.global_basis.inverse() * basis).orthonormalized()
+	sync_state.rpc(global_position, basis, velocity, visual.position, visual.basis, on_ship, rel_position, rel_basis)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PATH_RENAMED:
@@ -271,12 +278,12 @@ func get_interaction_prompt() -> String:
 func _respawn() -> void:
 	_driving_wheel = null
 	_clear_ship_latch()
-	_clear_remote_ship_latch()
+	_remote_target_on_ship = false
 	global_position = _spawn_position + Vector3(0.0, 1.0, 0.0)
 	velocity = Vector3.ZERO
 
 @rpc("any_peer", "unreliable", "call_remote")
-func sync_state(pos: Vector3, body_basis: Basis, body_velocity: Vector3, visual_pos: Vector3, visual_basis: Basis) -> void:
+func sync_state(pos: Vector3, body_basis: Basis, body_velocity: Vector3, visual_pos: Vector3, visual_basis: Basis, on_ship: bool, ship_rel_pos: Vector3, ship_rel_basis: Basis) -> void:
 	if is_multiplayer_authority():
 		return
 
@@ -285,6 +292,9 @@ func sync_state(pos: Vector3, body_basis: Basis, body_velocity: Vector3, visual_
 	_remote_target_velocity = body_velocity
 	_remote_target_visual_position = visual_pos
 	_remote_target_visual_basis = visual_basis
+	_remote_target_on_ship = on_ship
+	_remote_target_ship_rel_position = ship_rel_pos
+	_remote_target_ship_rel_basis = ship_rel_basis
 
 func _update_camera_state() -> void:
 	if camera == null:
@@ -301,7 +311,7 @@ func _on_session_ended() -> void:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_driving_wheel = null
 	_clear_ship_latch()
-	_clear_remote_ship_latch()
+	_remote_target_on_ship = false
 
 func _is_session_active() -> bool:
 	return Network.session_active
@@ -317,6 +327,7 @@ func _get_interaction_target() -> Object:
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
 	query.collide_with_areas = true
 	query.collide_with_bodies = true
+	query.collision_mask = 11
 	query.exclude = [get_rid()]
 	var result: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if result.is_empty():
@@ -378,8 +389,11 @@ func _update_drive_collision_state() -> void:
 	_drive_collision_disabled = should_disable
 
 func _apply_remote_state(delta: float) -> void:
-	_update_remote_ship_latch_state(delta)
-	_apply_remote_ship_follow_prediction()
+	if _remote_target_on_ship:
+		var ship: SkyShip = _get_primary_ship()
+		if ship != null:
+			_remote_target_position = ship.to_global(_remote_target_ship_rel_position)
+			_remote_target_basis = (ship.global_basis * _remote_target_ship_rel_basis).orthonormalized()
 
 	var pos_alpha: float = min(1.0, delta * remote_pos_smooth_speed)
 	var rot_alpha: float = min(1.0, delta * remote_rot_smooth_speed)
@@ -435,6 +449,10 @@ func _clear_ship_latch() -> void:
 	_ship_latch_time_remaining = 0.0
 
 func _probe_ship_below() -> SkyShip:
+	var ship_from_area: SkyShip = _probe_ship_deck_area_at(global_position)
+	if ship_from_area != null:
+		return ship_from_area
+
 	var from: Vector3 = global_position + Vector3.UP * 0.2
 	var to: Vector3 = from + (Vector3.DOWN * ship_probe_distance)
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
@@ -446,41 +464,11 @@ func _probe_ship_below() -> SkyShip:
 		return null
 	return hit.get("collider") as SkyShip
 
-func _update_remote_ship_latch_state(delta: float) -> void:
-	var ship: SkyShip = _probe_ship_below_at(_remote_target_position)
-	if ship == null:
-		ship = _probe_ship_below_at(global_position)
-
-	if ship == null:
-		if _remote_latched_ship == null:
-			return
-		_remote_ship_latch_time_remaining = max(0.0, _remote_ship_latch_time_remaining - delta)
-		if _remote_ship_latch_time_remaining <= 0.0:
-			_clear_remote_ship_latch()
-		return
-
-	if _remote_latched_ship == null or _remote_latched_ship != ship:
-		_remote_latched_ship = ship
-		_remote_latched_ship_transform = ship.global_transform
-	_remote_ship_latch_time_remaining = remote_ship_latch_duration
-
-func _apply_remote_ship_follow_prediction() -> void:
-	if _remote_latched_ship == null or not is_instance_valid(_remote_latched_ship):
-		return
-	if _remote_ship_latch_time_remaining <= 0.0:
-		return
-
-	var current_ship_transform: Transform3D = _remote_latched_ship.global_transform
-	var ship_delta: Transform3D = current_ship_transform * _remote_latched_ship_transform.affine_inverse()
-	global_position = ship_delta * global_position
-	_remote_target_position = ship_delta * _remote_target_position
-	_remote_latched_ship_transform = current_ship_transform
-
-func _clear_remote_ship_latch() -> void:
-	_remote_latched_ship = null
-	_remote_ship_latch_time_remaining = 0.0
-
 func _probe_ship_below_at(sample_position: Vector3) -> SkyShip:
+	var ship_from_area: SkyShip = _probe_ship_deck_area_at(sample_position)
+	if ship_from_area != null:
+		return ship_from_area
+
 	var from: Vector3 = sample_position + Vector3.UP * 0.2
 	var to: Vector3 = from + (Vector3.DOWN * ship_probe_distance)
 	var query: PhysicsRayQueryParameters3D = PhysicsRayQueryParameters3D.create(from, to)
@@ -491,3 +479,32 @@ func _probe_ship_below_at(sample_position: Vector3) -> SkyShip:
 	if hit.is_empty():
 		return null
 	return hit.get("collider") as SkyShip
+
+func _probe_ship_deck_area_at(sample_position: Vector3) -> SkyShip:
+	var params := PhysicsPointQueryParameters3D.new()
+	params.position = sample_position + Vector3(0.0, -0.2, 0.0)
+	params.collide_with_areas = true
+	params.collide_with_bodies = false
+	params.collision_mask = ship_deck_area_mask
+	var hits: Array[Dictionary] = get_world_3d().direct_space_state.intersect_point(params, 8)
+	for hit: Dictionary in hits:
+		var area: ShipDeckArea = hit.get("collider") as ShipDeckArea
+		if area == null:
+			continue
+		var ship: SkyShip = area.get_ship()
+		if ship != null:
+			return ship
+	return null
+
+func _get_sync_support_ship() -> SkyShip:
+	if _latched_ship != null and is_instance_valid(_latched_ship):
+		return _latched_ship
+	return _probe_ship_below()
+
+func _get_primary_ship() -> SkyShip:
+	var ships: Array[Node] = get_tree().get_nodes_in_group("sky_ship")
+	for node: Node in ships:
+		var ship: SkyShip = node as SkyShip
+		if ship != null:
+			return ship
+	return null

@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" uid="uid://derww3x2xhop" path="res://assets/FreeSample/Rowboat.fbx" id="11_k3n1d"]
 [ext_resource type="PackedScene" uid="uid://3lfwcjk5jbam" path="res://assets/FreeSample/Paddle.fbx" id="12_2o6r5"]
 [ext_resource type="PackedScene" uid="uid://bqs27crk7xxa2" path="res://assets/FreeSample/Building_1.fbx" id="13_70uel"]
+[ext_resource type="PackedScene" uid="uid://4at8t0o06cae" path="res://assets/voxel_treasure_asset_pack/scene.gltf" id="14_70uel"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_f3sb7"]
 size = Vector3(1, 0.2, 1)
@@ -93,7 +94,7 @@ mesh = SubResource("BoxMesh_gv5m4")
 surface_material_override/0 = SubResource("StandardMaterial3D_ground")
 
 [node name="SkyShip" parent="." unique_id=553199057 instance=ExtResource("5_pk5m8")]
-transform = Transform3D(0.999244, 0, 0.0388812, 0, 1, 0, -0.0388812, 0, 0.999244, 1.8064594, 32.658638, 4.265871)
+transform = Transform3D(0.999244, 0, 0.0388812, 0, 1, 0, -0.0388812, 0, 0.999244, 1.8064594, 32.10188, 4.265871)
 
 [node name="CargoCrate" parent="." unique_id=1588129755 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0292387, 33.306114, -5.178396)
@@ -162,3 +163,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55.99709, 2.1584969, -61.6814
 
 [node name="PalmTree3" parent="." unique_id=271087777 instance=ExtResource("8_ic0uy")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.84242, 2.1584969, -58.65593)
+
+[node name="Sketchfab_Scene" parent="." unique_id=267627833 instance=ExtResource("14_70uel")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 31, 5)
+visible = false

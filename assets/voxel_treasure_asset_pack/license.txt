@@ -1,0 +1,11 @@
+Model Information:
+* title:	Voxel Treasure Asset Pack
+* source:	https://sketchfab.com/3d-models/voxel-treasure-asset-pack-fda1d986acea48eda62743c1cb18995e
+* author:	Joel Bennett (https://sketchfab.com/jcbenne)
+
+Model License:
+* license type:	CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)
+* requirements:	Author must be credited. Commercial use is allowed.
+
+If you use this 3D model in your project be sure to copy paste this credit wherever you share it:
+This work is based on "Voxel Treasure Asset Pack" (https://sketchfab.com/3d-models/voxel-treasure-asset-pack-fda1d986acea48eda62743c1cb18995e) by Joel Bennett (https://sketchfab.com/jcbenne) licensed under CC-BY-4.0 (http://creativecommons.org/licenses/by/4.0/)

@@ -12,6 +12,7 @@ class_name SkyShip
 @export var max_sync_correction_speed: float = 1.2
 
 @onready var wheel: ShipWheel = $Wheel
+@onready var deck_area: Area3D = $DeckArea
 
 var driver_peer_id: int = 0
 var _sync_transform: Transform3D
@@ -123,6 +124,7 @@ func _run_authoritative_sim(delta: float) -> void:
 	if driver_peer_id != 0:
 		gravity_scale = 0.0
 		freeze = true
+		var previous_yaw: float = _drive_yaw
 		_drive_yaw += deg_to_rad(turn_speed_degrees) * _driver_turn_input * delta
 		_drive_altitude += climb_speed * _driver_pitch_input * delta
 		_drive_altitude = max(_drive_altitude, min_flight_altitude)
@@ -139,7 +141,8 @@ func _run_authoritative_sim(delta: float) -> void:
 		next_position.y = _drive_altitude
 		global_position = next_position
 		linear_velocity = (global_position - previous_position) / max(0.0001, delta)
-		var yaw_rate: float = deg_to_rad(turn_speed_degrees) * _driver_turn_input
+		var yaw_delta: float = wrapf(_drive_yaw - previous_yaw, -PI, PI)
+		var yaw_rate: float = yaw_delta / max(0.0001, delta)
 		angular_velocity = Vector3.UP * yaw_rate
 	else:
 		freeze = false
@@ -189,3 +192,11 @@ func _apply_driver_input(sender_id: int, turn_input: float, pitch_input: float) 
 		return
 	_driver_turn_input = clamp(turn_input, -1.0, 1.0)
 	_driver_pitch_input = clamp(pitch_input, -1.0, 1.0)
+
+func get_carry_origin() -> Vector3:
+	if deck_area != null:
+		return deck_area.global_position
+	return global_position
+
+func get_turn_input() -> float:
+	return _driver_turn_input

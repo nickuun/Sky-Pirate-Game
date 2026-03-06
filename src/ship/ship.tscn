@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cgeb3khhgnbvq" path="res://src/ship/ship.gd" id="1_p85r8"]
 [ext_resource type="Script" uid="uid://b0xhxtsbak1dh" path="res://src/ship/wheel.gd" id="2_hfi5q"]
 [ext_resource type="PackedScene" uid="uid://c4dwmkcx0m8ub" path="res://assets/FreeSample/Boat.fbx" id="3_kkffy"]
+[ext_resource type="Script" path="res://src/ship/deck_area.gd" id="4_q2mfr"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_ship"]
 friction = 1.25
@@ -19,6 +20,9 @@ roughness = 0.72
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_wheel"]
 size = Vector3(0.8, 1, 0.8)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_deck_area"]
+size = Vector3(6.6, 1.35, 3.7)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
 top_radius = 0.3
@@ -48,6 +52,17 @@ transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.71
 visible = false
 mesh = SubResource("BoxMesh_ship_hull")
 surface_material_override/0 = SubResource("StandardMaterial3D_ship_hull")
+
+[node name="DeckArea" type="Area3D" parent="."]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.724, 0.98, 0.11)
+collision_layer = 16
+collision_mask = 0
+monitoring = false
+monitorable = true
+script = ExtResource("4_q2mfr")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DeckArea"]
+shape = SubResource("BoxShape3D_deck_area")
 
 [node name="Wheel" type="Area3D" parent="." unique_id=1870123428]
 transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, 0.70582837, 0.9679675, 2.5132613)
