@@ -149,7 +149,8 @@ func request_pickup(target_holder_path: NodePath) -> void:
 	if holder_peer_id != 0 and holder_peer_id != sender_id:
 		return
 
-	set_sim_authority.rpc(1)
+	# While held, make the holder peer authoritative for responsive local carry.
+	set_sim_authority.rpc(sender_id)
 	set_holder.rpc(target_holder_path, sender_id)
 
 @rpc("any_peer", "reliable")
@@ -167,6 +168,8 @@ func request_drop() -> void:
 	linear_velocity = Vector3.ZERO
 	angular_velocity = Vector3.ZERO
 	set_holder.rpc(NodePath(""), 0)
+	# Return cargo simulation authority to server once released.
+	set_sim_authority.rpc(1)
 
 @rpc("any_peer", "reliable", "call_local")
 func set_holder(target_holder_path: NodePath, target_peer_id: int) -> void:
@@ -180,7 +183,7 @@ func set_holder(target_holder_path: NodePath, target_peer_id: int) -> void:
 func set_sim_authority(target_peer_id: int) -> void:
 	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
 		return
-	sim_peer_id = 1
+	sim_peer_id = max(1, target_peer_id)
 	set_multiplayer_authority(sim_peer_id)
 	sleeping = false
 
