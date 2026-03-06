@@ -23,7 +23,7 @@ class_name PlayerController
 @export var remote_pos_smooth_speed: float = 22.0
 @export var remote_rot_smooth_speed: float = 24.0
 @export var remote_pos_deadzone: float = 0.015
-@export var aim_screen_offset: Vector2 = Vector2(90.0, 8.0)
+@export var aim_screen_offset: Vector2 = Vector2.ZERO
 
 @onready var visual: Node3D = $Visual
 @onready var camera_pivot: Node3D = $CameraPivot
