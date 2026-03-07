@@ -111,7 +111,7 @@ mesh = SubResource("BoxMesh_gv5m4")
 surface_material_override/0 = SubResource("StandardMaterial3D_ground")
 
 [node name="SkyShip" parent="." unique_id=553199057 instance=ExtResource("5_pk5m8")]
-transform = Transform3D(1.9984876, 0, 0.077762395, 0.016208861, 1.95607, -0.41656655, -0.07605434, 0.41688177, 1.9545908, -7.1682577, 34.75384, 3.001381)
+transform = Transform3D(0.9992438, 9.313226e-10, 0.0388812, 0.0081044305, 0.978035, -0.20828328, -0.038027175, 0.20844088, 0.9772954, -7.1682577, 34.75384, 3.001381)
 
 [node name="CargoCrate" parent="." unique_id=1588129755 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0292387, 33.306114, -5.178396)
@@ -200,7 +200,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 31, 5)
 visible = false
 
 [node name="Whale" parent="." unique_id=575406144 instance=ExtResource("15_hiqwa")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -8.995559, 29.821117, 2.7971096)
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -28.5387, 29.821117, 2.7971096)
 script = ExtResource("16_1qwhl")
 orbit_radius = 72.0
 orbit_speed_degrees = 6.5
