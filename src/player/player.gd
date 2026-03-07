@@ -37,6 +37,7 @@ class_name PlayerController
 @export var ship_air_latch_duration: float = 0.75
 @export var ship_probe_distance: float = 1.35
 @export var ship_deck_area_mask: int = 16
+@export var ship_climb_speed: float = 4.2
 @export var wheel_lock_lerp_speed: float = 12.0
 @export var wheel_lock_blend_duration: float = 0.18
 @export var drive_collision_grace_duration: float = 0.2
@@ -75,6 +76,8 @@ var _remote_target_ship_rel_position: Vector3 = Vector3.ZERO
 var _remote_target_ship_rel_basis: Basis = Basis.IDENTITY
 var _throw_charging: bool = false
 var _throw_charge_time: float = 0.0
+var _hull_contact_ship: SkyShip = null
+var _hull_contact_normal: Vector3 = Vector3.ZERO
 var _is_ragdolled: bool = false
 var _ragdoll_time_remaining: float = 0.0
 var _ragdoll_spin_velocity: Vector3 = Vector3.ZERO
@@ -139,6 +142,7 @@ func _physics_process(delta: float) -> void:
 		_lock_to_wheel(delta)
 	else:
 		move_and_slide()
+		_refresh_ship_hull_contact()
 		_update_ship_latch_state(0.0)
 	_update_drive_collision_state(driving_now)
 
@@ -192,6 +196,9 @@ func _read_input() -> void:
 	_move_input = Input.get_vector("move_left", "move_right", "move_forward", "move_back")
 
 func _apply_gravity(delta: float) -> void:
+	if _is_ship_hull_climbing():
+		velocity.y = move_toward(velocity.y, 0.0, gravity * delta)
+		return
 	if not is_on_floor():
 		velocity.y -= gravity * delta
 	else:
@@ -219,6 +226,19 @@ func _apply_movement(delta: float) -> void:
 
 	var horiz_vel: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
 	var target_horiz: Vector3 = Vector3(target_vel.x, 0.0, target_vel.z)
+
+	if _is_ship_hull_climbing():
+		target_horiz *= 0.45
+		var climb_input: float = 0.0
+		if Input.is_action_pressed("jump"):
+			climb_input = 1.0
+		elif Input.is_action_pressed("move_back"):
+			climb_input = -1.0
+		if abs(climb_input) > 0.05:
+			var climb_target: float = clamp(climb_input, -1.0, 1.0) * ship_climb_speed
+			velocity.y = lerp(velocity.y, climb_target, 1.0 - exp(-10.0 * delta))
+		else:
+			velocity.y = move_toward(velocity.y, 0.0, gravity * delta)
 
 	var rate: float = acceleration if input_dir.length() > 0.0 else deceleration
 	var new_horiz: Vector3 = horiz_vel.lerp(target_horiz, 1.0 - exp(-rate * delta))
@@ -651,6 +671,12 @@ func _update_ship_latch_state(delta: float) -> void:
 		_clear_ship_latch()
 		return
 
+	if _is_ship_hull_climbing() and _hull_contact_ship != null:
+		_latched_ship = _hull_contact_ship
+		_latched_ship_transform = _hull_contact_ship.global_transform
+		_ship_latch_time_remaining = ship_air_latch_duration
+		return
+
 	var ship: SkyShip = _probe_ship_below()
 	if ship == null:
 		if _latched_ship == null:
@@ -744,3 +770,31 @@ func _get_primary_ship() -> SkyShip:
 		if ship != null:
 			return ship
 	return null
+
+func _refresh_ship_hull_contact() -> void:
+	_hull_contact_ship = null
+	_hull_contact_normal = Vector3.ZERO
+	var collision_count: int = get_slide_collision_count()
+	for i: int in range(collision_count):
+		var collision: KinematicCollision3D = get_slide_collision(i)
+		if collision == null:
+			continue
+		var collider: Object = collision.get_collider()
+		var ship: SkyShip = _find_ship_in_hierarchy(collider)
+		if ship == null:
+			continue
+		_hull_contact_ship = ship
+		_hull_contact_normal = collision.get_normal()
+		return
+
+func _find_ship_in_hierarchy(obj: Object) -> SkyShip:
+	var node: Node = obj as Node
+	while node != null:
+		var ship: SkyShip = node as SkyShip
+		if ship != null:
+			return ship
+		node = node.get_parent()
+	return null
+
+func _is_ship_hull_climbing() -> bool:
+	return _hull_contact_ship != null and _hull_contact_normal.y < 0.7 and not _is_ragdolled and not _is_driving()

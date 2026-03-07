@@ -3,13 +3,16 @@
 [ext_resource type="Script" uid="uid://cgeb3khhgnbvq" path="res://src/ship/ship.gd" id="1_p85r8"]
 [ext_resource type="Script" uid="uid://b0xhxtsbak1dh" path="res://src/ship/wheel.gd" id="2_hfi5q"]
 [ext_resource type="PackedScene" uid="uid://c4dwmkcx0m8ub" path="res://assets/FreeSample/Boat.fbx" id="3_kkffy"]
-[ext_resource type="Script" uid="uid://bmdn2bxat7jae" path="res://src/ship/deck_area.gd" id="4_q2mfr"]
+[ext_resource type="Script" path="res://src/ship/deck_area.gd" id="4_q2mfr"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_ship"]
 friction = 1.25
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ship_hull"]
-size = Vector3(7.477234, 0.8, 3.9423218)
+size = Vector3(7.477234, 2.3438478, 3.4983368)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_a5wj4"]
+size = Vector3(3.5000458, 0.757, 3.4407344)
 
 [sub_resource type="BoxMesh" id="BoxMesh_ship_hull"]
 size = Vector3(6, 0.8, 3)
@@ -43,13 +46,18 @@ angular_damp = 1.4
 script = ExtResource("1_p85r8")
 
 [node name="HullCollision" type="CollisionShape3D" parent="." unique_id=534116060]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.004038155, 0.2765081, 0.08457595)
-visible = false
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.0011313558, -0.4954158, 0.08457595)
 shape = SubResource("BoxShape3D_ship_hull")
 debug_color = Color(0.99607843, 0, 0.22352941, 1)
 
+[node name="LowerShipCollision" type="CollisionShape3D" parent="." unique_id=136664124]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0009689331, -2.0691721, -0.019867182)
+shape = SubResource("BoxShape3D_a5wj4")
+debug_color = Color(0.62352943, 0.3529412, 1, 1)
+
 [node name="HullMesh" type="MeshInstance3D" parent="." unique_id=1210813078]
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.009786308, 0.07515097, 0.011364281)
+visible = false
 mesh = SubResource("BoxMesh_ship_hull")
 surface_material_override/0 = SubResource("StandardMaterial3D_ship_hull")
 
