@@ -26,40 +26,39 @@ size = Vector3(1, 0.2, 1)
 size = Vector3(1, 0.2, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
-albedo_color = Color(0.313726, 0.67451, 0.372549, 1)
-roughness = 0.9
+albedo_color = Color(0.22, 0.62, 0.4, 1)
+roughness = 0.85
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7j3lk"]
-sky_top_color = Color(0.34902, 0.733333, 0.984314, 1)
-sky_horizon_color = Color(0.792157, 0.933333, 1, 1)
-ground_bottom_color = Color(0.941176, 0.913725, 0.737255, 1)
-ground_horizon_color = Color(0.741176, 0.858824, 0.776471, 1)
+sky_top_color = Color(0.4, 0.72, 1, 1)
+sky_horizon_color = Color(0.72, 0.9, 1, 1)
+ground_bottom_color = Color(0.9, 0.88, 0.7, 1)
+ground_horizon_color = Color(0.78, 0.88, 0.8, 1)
 
 [sub_resource type="Sky" id="Sky_spr6m"]
 sky_material = SubResource("ProceduralSkyMaterial_7j3lk")
 
 [sub_resource type="Environment" id="Environment_f3sb7"]
-background_mode = 2
 sky = SubResource("Sky_spr6m")
 ambient_light_source = 3
-ambient_light_sky_contribution = 0.86
-ambient_light_energy = 1.4
+ambient_light_sky_contribution = 0.75
+ambient_light_energy = 0.9
 tonemap_mode = 2
-tonemap_exposure = 1.22
+tonemap_exposure = 1.05
 fog_enabled = true
-fog_light_color = Color(0.741176, 0.901961, 0.988235, 1)
-fog_light_energy = 0.06
-fog_density = 0.00075
+fog_light_color = Color(0.76, 0.9, 1, 1)
+fog_light_energy = 0.05
+fog_density = 0.00055
 
 [node name="World" type="Node3D" unique_id=1867963118]
 script = ExtResource("1_f3sb7")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1141858138]
 transform = Transform3D(0.77801615, -0.29295242, 0.55576056, 0, 0.8846249, 0.46630338, -0.62824434, -0.36279154, 0.68825245, 0, 32.20235, 0)
-light_color = Color(1, 0.968627, 0.921569, 1)
-light_energy = 1.75
+light_color = Color(1, 0.94, 0.88, 1)
+light_energy = 1.65
 shadow_enabled = true
-shadow_opacity = 0.45
+shadow_opacity = 0.55
 
 [node name="CloudField" type="Node3D" parent="." unique_id=687193328]
 script = ExtResource("17_c2l0d")

@@ -23,7 +23,7 @@ transform = Transform3D(-0.0018432182, 0.08586904, 0.9963047, 0.00015886215, 0.9
 mesh = SubResource("CapsuleMesh_mf2ua")
 
 [node name="CameraPivot" type="Node3D" parent="." unique_id=1014377324]
-transform = Transform3D(1, 0, 0, 0, 0.9612617, 0.27563736, 0, -0.27563736, 0.9612617, 0.9, 1.15, 0.0)
+transform = Transform3D(1, 0, 0, 0, 0.9659258, 0.25881904, 0, -0.25881904, 0.9659258, 0.9, 1.05, 0.0)
 
 [node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot" unique_id=1020361452]
 spring_length = 2.0
