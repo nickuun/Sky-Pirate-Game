@@ -21,7 +21,7 @@ anchor_bottom = 0.5
 offset_left = -110.0
 offset_top = -70.0
 offset_right = 110.0
-offset_bottom = 92.0
+offset_bottom = 148.0
 grow_horizontal = 2
 grow_vertical = 2
 
@@ -52,3 +52,11 @@ text = "Respawn"
 [node name="RespawnShipButton" type="Button" parent="Panel/Margin/VBox"]
 layout_mode = 2
 text = "Respawn Ship"
+
+[node name="RestartGameButton" type="Button" parent="Panel/Margin/VBox"]
+layout_mode = 2
+text = "Restart Game"
+
+[node name="SpawnCargoButton" type="Button" parent="Panel/Margin/VBox"]
+layout_mode = 2
+text = "Spawn Cargo"

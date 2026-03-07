@@ -3,7 +3,7 @@
 [ext_resource type="Script" uid="uid://cgeb3khhgnbvq" path="res://src/ship/ship.gd" id="1_p85r8"]
 [ext_resource type="Script" uid="uid://b0xhxtsbak1dh" path="res://src/ship/wheel.gd" id="2_hfi5q"]
 [ext_resource type="PackedScene" uid="uid://c4dwmkcx0m8ub" path="res://assets/FreeSample/Boat.fbx" id="3_kkffy"]
-[ext_resource type="Script" path="res://src/ship/deck_area.gd" id="4_q2mfr"]
+[ext_resource type="Script" uid="uid://bmdn2bxat7jae" path="res://src/ship/deck_area.gd" id="4_q2mfr"]
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_ship"]
 friction = 1.25
@@ -18,11 +18,11 @@ size = Vector3(6, 0.8, 3)
 albedo_color = Color(0.803922, 0.521569, 0.282353, 1)
 roughness = 0.72
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_wheel"]
-size = Vector3(0.8, 1, 0.8)
-
 [sub_resource type="BoxShape3D" id="BoxShape3D_deck_area"]
 size = Vector3(6.6, 1.35, 3.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wheel"]
+size = Vector3(0.8, 1, 0.8)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
 top_radius = 0.3
@@ -43,29 +43,28 @@ angular_damp = 1.4
 script = ExtResource("1_p85r8")
 
 [node name="HullCollision" type="CollisionShape3D" parent="." unique_id=534116060]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.7297576, 0.2765081, 0.16209418)
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.004038155, 0.2765081, -0.2453267)
 shape = SubResource("BoxShape3D_ship_hull")
 debug_color = Color(0.99607843, 0, 0.22352941, 1)
 
 [node name="HullMesh" type="MeshInstance3D" parent="." unique_id=1210813078]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.71593314, 0.07515097, 0.08888252)
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.009786308, 0.07515097, -0.31853837)
 visible = false
 mesh = SubResource("BoxMesh_ship_hull")
 surface_material_override/0 = SubResource("StandardMaterial3D_ship_hull")
 
-[node name="DeckArea" type="Area3D" parent="."]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.724, 0.98, 0.11)
+[node name="DeckArea" type="Area3D" parent="." unique_id=586974134]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.0017194748, 0.98, -0.29742086)
 collision_layer = 16
 collision_mask = 0
 monitoring = false
-monitorable = true
 script = ExtResource("4_q2mfr")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="DeckArea"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DeckArea" unique_id=2018829772]
 shape = SubResource("BoxShape3D_deck_area")
 
 [node name="Wheel" type="Area3D" parent="." unique_id=1870123428]
-transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, 0.70582837, 0.9679675, 2.5132613)
+transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, -0.019891083, 0.9679675, 2.1058404)
 script = ExtResource("2_hfi5q")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wheel" unique_id=1948018495]
@@ -80,4 +79,4 @@ mesh = SubResource("CylinderMesh_wheel")
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.47698277, 0.532887, -0.19385713)
 
 [node name="Boat" parent="." unique_id=225140104 instance=ExtResource("3_kkffy")]
-transform = Transform3D(-0.99999744, 0, 0.0022689402, 0, 1, 0, -0.0022689402, 0, -0.99999744, 0.72675395, -2.4184554, -0.7888018)
+transform = Transform3D(-0.99999744, 0, 0.0022689402, 0, 1, 0, -0.0022689402, 0, -0.99999744, 0.0010344982, -2.4184554, -1.1962227)

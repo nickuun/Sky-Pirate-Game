@@ -14,10 +14,15 @@ config/name="Sky Pirate"
 run/main_scene="uid://cqknyxs0orie5"
 config/features=PackedStringArray("4.6", "GL Compatibility")
 config/icon="res://icon.svg"
+boot_splash/defaults/default_clear_color=Color(0.18373618, 0.26078427, 0.6120255, 1)
 
 [autoload]
 
 Network="*uid://e5tpt2rnvq6r"
+
+[display]
+
+window/size/mode=4
 
 [input]
 
@@ -72,3 +77,4 @@ rendering_device/driver.windows="d3d12"
 renderer/rendering_method="gl_compatibility"
 renderer/rendering_method.mobile="gl_compatibility"
 textures/vram_compression/import_etc2_astc=true
+environment/defaults/default_clear_color=Color(0.18373618, 0.26078427, 0.6120255, 1)

@@ -5,7 +5,7 @@ class_name PlayerController
 @export var acceleration: float = 18.0
 @export var deceleration: float = 22.0
 @export var jump_velocity: float = 5.0
-@export var gravity: float = 18.0
+@export var gravity: float = 12.0
 
 @export var waddle_tilt_degrees: float = 8.0
 @export var waddle_bob_amount: float = 0.06
@@ -20,6 +20,9 @@ class_name PlayerController
 @export var ship_latch_duration: float = 0.35
 @export var ship_probe_distance: float = 1.35
 @export var ship_deck_area_mask: int = 16
+@export var wheel_lock_lerp_speed: float = 12.0
+@export var wheel_lock_blend_duration: float = 0.18
+@export var drive_collision_grace_duration: float = 0.2
 @export var remote_pos_smooth_speed: float = 22.0
 @export var remote_rot_smooth_speed: float = 24.0
 @export var remote_pos_deadzone: float = 0.015
@@ -39,6 +42,9 @@ var _spawn_position: Vector3 = Vector3.ZERO
 var _cargo_control_cooldown: float = 0.0
 var _driving_wheel: ShipWheel = null
 var _drive_collision_disabled: bool = false
+var _was_driving: bool = false
+var _wheel_lock_blend_time_remaining: float = 0.0
+var _drive_collision_grace_remaining: float = 0.0
 var _latched_ship: SkyShip = null
 var _latched_ship_transform: Transform3D = Transform3D.IDENTITY
 var _ship_latch_time_remaining: float = 0.0
@@ -79,10 +85,16 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_update_driving_wheel_reference()
+	var driving_now: bool = _is_driving()
+	if driving_now != _was_driving:
+		_wheel_lock_blend_time_remaining = wheel_lock_blend_duration
+		_drive_collision_grace_remaining = drive_collision_grace_duration
+	_was_driving = driving_now
+	_drive_collision_grace_remaining = max(0.0, _drive_collision_grace_remaining - delta)
 	_read_input()
 	_update_ship_latch_state(delta)
 	_apply_latched_ship_follow(delta)
-	if _is_driving():
+	if driving_now:
 		_apply_drive_control()
 	else:
 		_apply_gravity(delta)
@@ -90,15 +102,13 @@ func _physics_process(delta: float) -> void:
 	_apply_waddle(delta)
 	_update_cargo_control_request(delta)
 	_try_interact()
-	if _is_driving():
+	if driving_now:
 		_clear_ship_latch()
-		_lock_to_wheel()
+		_lock_to_wheel(delta)
 	else:
-		if velocity.y <= 0.0:
-			apply_floor_snap()
 		move_and_slide()
 		_update_ship_latch_state(0.0)
-	_update_drive_collision_state()
+	_update_drive_collision_state(driving_now)
 
 	var support_ship: SkyShip = _get_sync_support_ship()
 	var on_ship: bool = support_ship != null
@@ -243,13 +253,22 @@ func _request_pickup(cargo: CargoCrate) -> void:
 		cargo.request_pickup.rpc_id(1, hold_point.get_path())
 
 func _request_drop(cargo: CargoCrate) -> void:
+	var release_transform: Transform3D = cargo.global_transform
+	var release_linear_velocity: Vector3 = cargo.linear_velocity
+	var release_angular_velocity: Vector3 = cargo.angular_velocity
 	if multiplayer.is_server():
-		cargo.request_drop()
+		cargo.request_drop(release_transform, release_linear_velocity, release_angular_velocity)
 	else:
-		cargo.request_drop.rpc_id(1)
+		cargo.request_drop.rpc_id(1, release_transform, release_linear_velocity, release_angular_velocity)
 
 func request_respawn() -> void:
 	if not is_multiplayer_authority():
+		return
+	_respawn()
+
+@rpc("any_peer", "reliable", "call_local")
+func force_respawn_from_server() -> void:
+	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
 		return
 	_respawn()
 
@@ -277,6 +296,9 @@ func get_interaction_prompt() -> String:
 
 func _respawn() -> void:
 	_driving_wheel = null
+	_was_driving = false
+	_wheel_lock_blend_time_remaining = 0.0
+	_drive_collision_grace_remaining = 0.0
 	_clear_ship_latch()
 	_remote_target_on_ship = false
 	global_position = _spawn_position + Vector3(0.0, 1.0, 0.0)
@@ -310,6 +332,9 @@ func _on_session_ended() -> void:
 	if camera.current:
 		Input.mouse_mode = Input.MOUSE_MODE_VISIBLE
 	_driving_wheel = null
+	_was_driving = false
+	_wheel_lock_blend_time_remaining = 0.0
+	_drive_collision_grace_remaining = 0.0
 	_clear_ship_latch()
 	_remote_target_on_ship = false
 
@@ -365,22 +390,29 @@ func _apply_drive_control() -> void:
 	if ship == null:
 		return
 
-	# A/D steer yaw. W pitches nose down, S pitches nose up.
+	# A/D steer trim latch. W/S pitch nose. Shift/Ctrl adjust throttle.
 	var turn_input: float = Input.get_axis("move_left", "move_right")
 	var pitch_input: float = Input.get_axis("move_back", "move_forward")
-	ship.submit_driver_input(turn_input, pitch_input)
+	var accelerating: bool = Input.is_action_pressed("ship_accelerate")
+	var decelerating: bool = Input.is_action_pressed("ship_decelerate")
+	ship.submit_driver_input(turn_input, pitch_input, accelerating, decelerating)
 
-func _lock_to_wheel() -> void:
+func _lock_to_wheel(delta: float) -> void:
 	if _driving_wheel == null:
 		return
 	var anchor: Marker3D = _driving_wheel.get_driver_anchor()
 	if anchor == null:
 		return
-	global_position = anchor.global_position
+	if _wheel_lock_blend_time_remaining > 0.0:
+		var alpha: float = min(1.0, delta * wheel_lock_lerp_speed)
+		global_position = global_position.lerp(anchor.global_position, alpha)
+		_wheel_lock_blend_time_remaining = max(0.0, _wheel_lock_blend_time_remaining - delta)
+	else:
+		global_position = anchor.global_position
 	velocity = Vector3.ZERO
 
-func _update_drive_collision_state() -> void:
-	var should_disable: bool = _is_driving()
+func _update_drive_collision_state(driving_now: bool) -> void:
+	var should_disable: bool = driving_now or _drive_collision_grace_remaining > 0.0
 	if should_disable == _drive_collision_disabled:
 		return
 

@@ -6,6 +6,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/ui_pause.tscn" id="4_ivb8m"]
 [ext_resource type="PackedScene" uid="uid://cvl73ob2vbko4" path="res://src/ship/ship.tscn" id="5_pk5m8"]
 [ext_resource type="PackedScene" path="res://src/ui/ui_interaction.tscn" id="6_r36rn"]
+[ext_resource type="Script" path="res://src/ui/ui_fps.gd" id="7_fpsui"]
 [ext_resource type="PackedScene" uid="uid://c2kcr08rr2fx0" path="res://assets/FreeSample/PalmTree.fbx" id="8_ic0uy"]
 [ext_resource type="PackedScene" uid="uid://cdg7v5adypim" path="res://assets/FreeSample/Rock_4.fbx" id="9_k3n1d"]
 [ext_resource type="PackedScene" uid="uid://buskgqny0vtno" path="res://assets/FreeSample/Lantern_1.fbx" id="10_2o6r5"]
@@ -15,6 +16,8 @@
 [ext_resource type="PackedScene" uid="uid://bqs27crk7xxa2" path="res://assets/FreeSample/Building_1.fbx" id="13_70uel"]
 [ext_resource type="PackedScene" uid="uid://4at8t0o06cae" path="res://assets/voxel_treasure_asset_pack/scene.gltf" id="14_70uel"]
 [ext_resource type="PackedScene" uid="uid://b3aqu6ux07ud3" path="res://assets/blockbench-whale-free/source/model.gltf" id="15_hiqwa"]
+[ext_resource type="Script" uid="uid://blfxs2scrg62e" path="res://src/world/sky_whale.gd" id="16_1qwhl"]
+[ext_resource type="Script" uid="uid://c8mo72kepdiwx" path="res://src/world/cloud_field.gd" id="17_c2l0d"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_f3sb7"]
 size = Vector3(1, 0.2, 1)
@@ -27,10 +30,10 @@ albedo_color = Color(0.313726, 0.67451, 0.372549, 1)
 roughness = 0.9
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7j3lk"]
-sky_top_color = Color(0.227451, 0.631373, 0.929412, 1)
-sky_horizon_color = Color(0.694118, 0.92549, 1, 1)
+sky_top_color = Color(0.34902, 0.733333, 0.984314, 1)
+sky_horizon_color = Color(0.792157, 0.933333, 1, 1)
 ground_bottom_color = Color(0.941176, 0.913725, 0.737255, 1)
-ground_horizon_color = Color(0.717647, 0.913725, 0.772549, 1)
+ground_horizon_color = Color(0.741176, 0.858824, 0.776471, 1)
 
 [sub_resource type="Sky" id="Sky_spr6m"]
 sky_material = SubResource("ProceduralSkyMaterial_7j3lk")
@@ -39,22 +42,35 @@ sky_material = SubResource("ProceduralSkyMaterial_7j3lk")
 background_mode = 2
 sky = SubResource("Sky_spr6m")
 ambient_light_source = 3
-ambient_light_sky_contribution = 0.72
+ambient_light_sky_contribution = 0.86
+ambient_light_energy = 1.4
 tonemap_mode = 2
-tonemap_exposure = 1.28
+tonemap_exposure = 1.22
 fog_enabled = true
-fog_light_color = Color(0.639216, 0.905882, 0.964706, 1)
-fog_light_energy = 0.24
-fog_density = 0.0025
+fog_light_color = Color(0.741176, 0.901961, 0.988235, 1)
+fog_light_energy = 0.06
+fog_density = 0.00075
 
 [node name="World" type="Node3D" unique_id=1867963118]
 script = ExtResource("1_f3sb7")
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=1141858138]
 transform = Transform3D(0.77801615, -0.29295242, 0.55576056, 0, 0.8846249, 0.46630338, -0.62824434, -0.36279154, 0.68825245, 0, 32.20235, 0)
-light_color = Color(1, 0.945098, 0.819608, 1)
-light_energy = 2.35
+light_color = Color(1, 0.968627, 0.921569, 1)
+light_energy = 1.75
 shadow_enabled = true
+shadow_opacity = 0.45
+
+[node name="CloudField" type="Node3D" parent="." unique_id=687193328]
+script = ExtResource("17_c2l0d")
+cloud_count = 44
+area_extent = 120.0
+max_height = 50.0
+drift_speed = 0.22
+fade_edge_fraction = 0.28
+min_boxes_per_cloud = 6
+max_boxes_per_cloud = 12
+cloud_spread = 5.6
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=535501066]
 transform = Transform3D(15, 0, 0, 0, 15, 0, 0, 0, 15, 0.6442001, -2.8369308, -1.3342867)
@@ -135,6 +151,21 @@ spawn_path = NodePath("../Players")
 
 [node name="UIInteraction" parent="UI" unique_id=1652084970 instance=ExtResource("6_r36rn")]
 
+[node name="FPS" type="Label" parent="UI" unique_id=1140855730]
+layout_mode = 1
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -140.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 36.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 2
+text = "FPS: 0"
+script = ExtResource("7_fpsui")
+
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=570198560]
 environment = SubResource("Environment_f3sb7")
 
@@ -169,5 +200,10 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 50.84242, 2.1584969, -58.6559
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5, 31, 5)
 visible = false
 
-[node name="blockbench_export" parent="." unique_id=575406144 instance=ExtResource("15_hiqwa")]
+[node name="Whale" parent="." unique_id=575406144 instance=ExtResource("15_hiqwa")]
 transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -8.995559, 29.821117, 2.7971096)
+script = ExtResource("16_1qwhl")
+orbit_radius = 72.0
+orbit_speed_degrees = 6.5
+bob_height = 2.8
+bob_speed = 0.55

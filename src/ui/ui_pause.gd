@@ -5,12 +5,16 @@ class_name UIPause
 @onready var resume_button: Button = $Panel/Margin/VBox/ResumeButton
 @onready var respawn_button: Button = $Panel/Margin/VBox/RespawnButton
 @onready var respawn_ship_button: Button = $Panel/Margin/VBox/RespawnShipButton
+@onready var restart_game_button: Button = $Panel/Margin/VBox/RestartGameButton
+@onready var spawn_cargo_button: Button = $Panel/Margin/VBox/SpawnCargoButton
 
 func _ready() -> void:
 	visible = false
 	resume_button.pressed.connect(_on_resume_pressed)
 	respawn_button.pressed.connect(_on_respawn_pressed)
 	respawn_ship_button.pressed.connect(_on_respawn_ship_pressed)
+	restart_game_button.pressed.connect(_on_restart_game_pressed)
+	spawn_cargo_button.pressed.connect(_on_spawn_cargo_pressed)
 	Network.session_active_changed.connect(_on_session_active_changed)
 	_on_session_active_changed(Network.session_active)
 
@@ -56,6 +60,22 @@ func _on_respawn_ship_pressed() -> void:
 			ship.request_respawn_ship()
 	_close_menu()
 
+func _on_restart_game_pressed() -> void:
+	if not multiplayer.is_server():
+		return
+	var world: WorldScene = get_tree().current_scene as WorldScene
+	if world != null:
+		world.restart_world()
+	_close_menu()
+
+func _on_spawn_cargo_pressed() -> void:
+	if not multiplayer.is_server():
+		return
+	var world: WorldScene = get_tree().current_scene as WorldScene
+	if world != null:
+		world.spawn_cargo_at_host_spawn()
+	_close_menu()
+
 func _find_local_player() -> PlayerController:
 	for node: Node in get_tree().get_nodes_in_group("player_controller"):
 		var p: PlayerController = node as PlayerController
@@ -68,3 +88,5 @@ func _is_session_active() -> bool:
 
 func _on_session_active_changed(_active: bool) -> void:
 	respawn_ship_button.visible = multiplayer.is_server()
+	restart_game_button.visible = multiplayer.is_server()
+	spawn_cargo_button.visible = multiplayer.is_server()
