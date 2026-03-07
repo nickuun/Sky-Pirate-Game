@@ -9,6 +9,16 @@ class_name SkyShip
 @export var min_flight_altitude: float = -2.0
 @export var idle_sink_speed: float = 0.45
 @export var idle_gravity_scale: float = 0.15
+@export var turn_lean_degrees: float = 7.0
+@export var turn_lean_response: float = 6.5
+@export var idle_sway_degrees: float = 1.2
+@export var idle_sway_speed: float = 0.85
+@export var throttle_sway_degrees: float = 1.8
+@export var throttle_sway_speed: float = 1.35
+@export var landed_level_rate: float = 2.8
+@export var grounded_probe_distance: float = 0.16
+@export var grounded_blend_in_speed: float = 8.0
+@export var grounded_blend_out_speed: float = 4.0
 @export var sync_lerp_speed: float = 16.0
 @export var sync_position_deadzone: float = 0.035
 @export var sync_correction_gain: float = 3.5
@@ -29,6 +39,11 @@ var _driver_turn_input: float = 0.0
 var _driver_pitch_input: float = 0.0
 var _driver_accelerating: bool = false
 var _driver_decelerating: bool = false
+var _drive_roll: float = 0.0
+var _drive_pitch_offset: float = 0.0
+var _sway_time: float = 0.0
+var _grounded_blend: float = 0.0
+var _grounded_hold_y: float = NAN
 
 func _ready() -> void:
 	_sync_transform = global_transform
@@ -36,6 +51,8 @@ func _ready() -> void:
 	var euler: Vector3 = global_basis.get_euler()
 	_drive_yaw = euler.y
 	_drive_pitch = euler.x
+	_drive_roll = euler.z
+	_drive_pitch_offset = 0.0
 	set_multiplayer_authority(1)
 	can_sleep = false
 	add_to_group("sky_ship")
@@ -127,6 +144,12 @@ func _server_toggle_drive(sender_id: int) -> void:
 	set_driver_peer.rpc(sender_id)
 
 func _run_authoritative_sim(delta: float) -> void:
+	_sway_time += delta
+	var raw_grounded: bool = _is_grounded_against_world()
+	var blend_speed: float = grounded_blend_in_speed if raw_grounded else grounded_blend_out_speed
+	_grounded_blend = move_toward(_grounded_blend, 1.0 if raw_grounded else 0.0, delta * blend_speed)
+	var grounded: bool = _grounded_blend > 0.35
+
 	if driver_peer_id != 0:
 		var throttle_step: float = delta / max(0.05, throttle_ramp_seconds)
 		if _driver_accelerating and not _driver_decelerating:
@@ -137,8 +160,9 @@ func _run_authoritative_sim(delta: float) -> void:
 	if driver_peer_id != 0 or _drive_throttle > 0.001:
 		gravity_scale = 0.0
 		freeze = true
-		var previous_pitch: float = _drive_pitch
+		var previous_pitch: float = _drive_pitch + _drive_pitch_offset
 		var previous_yaw: float = _drive_yaw
+		var previous_roll: float = _drive_roll
 		var motion_ratio: float = clamp(_drive_throttle, 0.0, 1.0)
 		if driver_peer_id != 0:
 			_drive_yaw += deg_to_rad(turn_speed_degrees) * _driver_turn_input * motion_ratio * delta
@@ -146,12 +170,26 @@ func _run_authoritative_sim(delta: float) -> void:
 		if driver_peer_id != 0:
 			_drive_pitch -= deg_to_rad(pitch_speed_degrees) * _driver_pitch_input * motion_ratio * delta
 		_drive_pitch = clamp(_drive_pitch, deg_to_rad(-max_pitch_degrees), deg_to_rad(max_pitch_degrees))
+		if grounded:
+			var level_alpha: float = min(1.0, landed_level_rate * delta)
+			_drive_pitch = lerp(_drive_pitch, 0.0, level_alpha)
+		var roll_target: float = deg_to_rad(-turn_lean_degrees) * _driver_turn_input * motion_ratio
+		var roll_alpha: float = 1.0 - exp(-turn_lean_response * delta)
+		if grounded:
+			roll_target = 0.0
+		_drive_roll = lerp_angle(_drive_roll, roll_target, roll_alpha)
+		var sway_target: float = 0.0
+		if not grounded:
+			sway_target = sin(_sway_time * lerpf(idle_sway_speed, throttle_sway_speed, motion_ratio)) * deg_to_rad(lerpf(idle_sway_degrees, throttle_sway_degrees, motion_ratio))
+		_drive_pitch_offset = lerpf(_drive_pitch_offset, sway_target, min(1.0, delta * 2.0))
+		var applied_pitch: float = _drive_pitch + _drive_pitch_offset
 
 		var previous_position: Vector3 = global_position
-		var drive_basis: Basis = Basis.from_euler(Vector3(_drive_pitch, _drive_yaw, 0.0))
+		var drive_basis: Basis = Basis.from_euler(Vector3(applied_pitch, _drive_yaw, _drive_roll))
 		global_basis = drive_basis
 
-		var fwd: Vector3 = -drive_basis.z
+		var motion_basis: Basis = Basis.from_euler(Vector3(_drive_pitch, _drive_yaw, 0.0))
+		var fwd: Vector3 = -motion_basis.z
 		if fwd.length() > 0.001:
 			fwd = fwd.normalized()
 		var drive_speed: float = cruise_speed * _drive_throttle
@@ -164,23 +202,58 @@ func _run_authoritative_sim(delta: float) -> void:
 			# Hit something while flying; stop throttle so crashes feel deterministic.
 			_drive_throttle = 0.0
 		linear_velocity = (global_position - previous_position) / max(0.0001, delta)
-		var pitch_delta: float = wrapf(_drive_pitch - previous_pitch, -PI, PI)
+		var pitch_delta: float = wrapf(applied_pitch - previous_pitch, -PI, PI)
 		var yaw_delta: float = wrapf(_drive_yaw - previous_yaw, -PI, PI)
+		var roll_delta: float = wrapf(_drive_roll - previous_roll, -PI, PI)
 		var pitch_rate: float = pitch_delta / max(0.0001, delta)
 		var yaw_rate: float = yaw_delta / max(0.0001, delta)
-		angular_velocity = (global_basis.x * pitch_rate) + (Vector3.UP * yaw_rate)
+		var roll_rate: float = roll_delta / max(0.0001, delta)
+		angular_velocity = (global_basis.x * pitch_rate) + (Vector3.UP * yaw_rate) + (global_basis.z * roll_rate)
+		_grounded_hold_y = NAN
 	else:
 		# Hover-stable idle: no gravity drop and no physics push jitter from players.
 		freeze = true
 		gravity_scale = 0.0
+		var previous_pitch: float = _drive_pitch + _drive_pitch_offset
+		var previous_roll: float = _drive_roll
 		var previous_position: Vector3 = global_position
-		if _drive_throttle <= 0.001:
+		var idle_sway_target: float = 0.0
+		if not grounded:
+			idle_sway_target = sin(_sway_time * idle_sway_speed) * deg_to_rad(idle_sway_degrees)
+		else:
+			_drive_pitch = lerp(_drive_pitch, 0.0, min(1.0, landed_level_rate * delta))
+		_drive_pitch_offset = lerpf(_drive_pitch_offset, idle_sway_target, min(1.0, delta * 1.8))
+		_drive_roll = lerp_angle(_drive_roll, 0.0, 1.0 - exp(-turn_lean_response * delta))
+		global_basis = Basis.from_euler(Vector3(_drive_pitch + _drive_pitch_offset, _drive_yaw, _drive_roll))
+		if _drive_throttle <= 0.001 and not grounded:
 			var sink_motion: Vector3 = Vector3.DOWN * idle_sink_speed * delta
 			sink_motion = _clip_motion_with_collision(sink_motion)
 			global_position += sink_motion
 			global_position.y = max(min_flight_altitude, global_position.y)
+		if grounded and _drive_throttle <= 0.001 and driver_peer_id == 0:
+			if is_nan(_grounded_hold_y):
+				_grounded_hold_y = global_position.y
+			else:
+				global_position.y = max(global_position.y, _grounded_hold_y)
+		else:
+			_grounded_hold_y = NAN
 		linear_velocity = (global_position - previous_position) / max(0.0001, delta)
-		angular_velocity = Vector3.ZERO
+		var pitch_rate: float = wrapf((_drive_pitch + _drive_pitch_offset) - previous_pitch, -PI, PI) / max(0.0001, delta)
+		var roll_rate: float = wrapf(_drive_roll - previous_roll, -PI, PI) / max(0.0001, delta)
+		angular_velocity = (global_basis.x * pitch_rate) + (global_basis.z * roll_rate)
+		if grounded and _drive_throttle <= 0.001 and driver_peer_id == 0:
+			angular_velocity = Vector3.ZERO
+
+func _is_grounded_against_world() -> bool:
+	var probe_motion: Vector3 = Vector3.DOWN * max(0.01, grounded_probe_distance)
+	var collision := KinematicCollision3D.new()
+	var blocked: bool = test_move(global_transform, probe_motion, collision)
+	if not blocked:
+		return false
+	var collider: Object = collision.get_collider()
+	if collider is PlayerController or collider is CargoCrate or collider is ShipWheel or collider is SkyShip:
+		return false
+	return true
 
 func _run_remote_sim(delta: float) -> void:
 	freeze = true
@@ -220,6 +293,11 @@ func force_respawn_state(respawn_transform: Transform3D) -> void:
 	_driver_pitch_input = 0.0
 	_driver_accelerating = false
 	_driver_decelerating = false
+	_drive_roll = 0.0
+	_drive_pitch_offset = 0.0
+	_sway_time = 0.0
+	_grounded_blend = 0.0
+	_grounded_hold_y = NAN
 	freeze = true
 	gravity_scale = 0.0
 	linear_velocity = Vector3.ZERO
@@ -245,14 +323,26 @@ func _clip_motion_with_collision(requested_motion: Vector3) -> Vector3:
 		return Vector3.ZERO
 
 	var from: Transform3D = global_transform
-	if not test_move(from, requested_motion):
+	var collision := KinematicCollision3D.new()
+	var blocked: bool = test_move(from, requested_motion, collision)
+	if not blocked:
+		return requested_motion
+	var collider: Object = collision.get_collider()
+	if collider is PlayerController or collider is CargoCrate or collider is ShipWheel:
+		# Ignore ship-internal occupants/props for movement clipping so throttle does not stall.
 		return requested_motion
 
 	var low: float = 0.0
 	var high: float = 1.0
 	for _i: int in range(7):
 		var mid: float = (low + high) * 0.5
-		if test_move(from, requested_motion * mid):
+		var mid_collision := KinematicCollision3D.new()
+		var mid_blocked: bool = test_move(from, requested_motion * mid, mid_collision)
+		if mid_blocked:
+			var mid_collider: Object = mid_collision.get_collider()
+			if mid_collider is PlayerController or mid_collider is CargoCrate or mid_collider is ShipWheel:
+				low = mid
+				continue
 			high = mid
 		else:
 			low = mid

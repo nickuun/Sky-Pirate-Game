@@ -43,18 +43,19 @@ angular_damp = 1.4
 script = ExtResource("1_p85r8")
 
 [node name="HullCollision" type="CollisionShape3D" parent="." unique_id=534116060]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.004038155, 0.2765081, -0.2453267)
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0.004038155, 0.2765081, 0.08457595)
+visible = false
 shape = SubResource("BoxShape3D_ship_hull")
 debug_color = Color(0.99607843, 0, 0.22352941, 1)
 
 [node name="HullMesh" type="MeshInstance3D" parent="." unique_id=1210813078]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.009786308, 0.07515097, -0.31853837)
-visible = false
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.009786308, 0.07515097, 0.011364281)
 mesh = SubResource("BoxMesh_ship_hull")
 surface_material_override/0 = SubResource("StandardMaterial3D_ship_hull")
 
 [node name="DeckArea" type="Area3D" parent="." unique_id=586974134]
-transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.0017194748, 0.98, -0.29742086)
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.0017194748, 0.98, 0.03248179)
+visible = false
 collision_layer = 16
 collision_mask = 0
 monitoring = false
@@ -64,7 +65,8 @@ script = ExtResource("4_q2mfr")
 shape = SubResource("BoxShape3D_deck_area")
 
 [node name="Wheel" type="Area3D" parent="." unique_id=1870123428]
-transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, -0.019891083, 0.9679675, 2.1058404)
+transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, -0.019891083, 0.9679675, 2.435743)
+visible = false
 script = ExtResource("2_hfi5q")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wheel" unique_id=1948018495]
@@ -79,4 +81,4 @@ mesh = SubResource("CylinderMesh_wheel")
 transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.47698277, 0.532887, -0.19385713)
 
 [node name="Boat" parent="." unique_id=225140104 instance=ExtResource("3_kkffy")]
-transform = Transform3D(-0.99999744, 0, 0.0022689402, 0, 1, 0, -0.0022689402, 0, -0.99999744, 0.0010344982, -2.4184554, -1.1962227)
+transform = Transform3D(-0.99999744, 0, 0.0022689402, 0, 1, 0, -0.0022689402, 0, -0.99999744, 0.0010344982, -2.4184554, -0.86632)

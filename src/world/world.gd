@@ -7,6 +7,12 @@ class_name WorldScene
 @onready var players_root: Node3D = $Players
 @onready var spawner: MultiplayerSpawner = $Spawner
 
+var _physics_debug_enabled: bool = false
+var _physics_debug_timer: float = 0.0
+const _PHYSICS_DEBUG_INTERVAL: float = 0.25
+var _physics_debug_toggle_latch: bool = false
+var _physics_debug_label: Label = null
+
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player_data
 	spawner.add_spawnable_scene(player_scene.resource_path)
@@ -19,6 +25,25 @@ func _ready() -> void:
 
 	# In case the world starts after a multiplayer session already exists.
 	_on_session_started()
+	_setup_physics_debug_label()
+
+func _process(delta: float) -> void:
+	var toggle_pressed: bool = Input.is_key_pressed(KEY_F6)
+	if toggle_pressed and not _physics_debug_toggle_latch:
+		_physics_debug_enabled = not _physics_debug_enabled
+		_physics_debug_timer = 0.0
+		print("[PHYSDBG] enabled=", _physics_debug_enabled)
+		if _physics_debug_label != null:
+			_physics_debug_label.visible = _physics_debug_enabled
+	_physics_debug_toggle_latch = toggle_pressed
+
+	if not _physics_debug_enabled:
+		return
+	_physics_debug_timer += delta
+	if _physics_debug_timer < _PHYSICS_DEBUG_INTERVAL:
+		return
+	_physics_debug_timer = 0.0
+	_print_ship_physics_debug()
 
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
@@ -100,3 +125,69 @@ func _get_player_spawn_local(id: int) -> Vector3:
 
 func _get_player_spawn_global(id: int) -> Vector3:
 	return players_root.to_global(_get_player_spawn_local(id))
+
+func _print_ship_physics_debug() -> void:
+	var ship: SkyShip = _get_primary_ship()
+	if ship == null:
+		print("[PHYSDBG] no_ship")
+		if _physics_debug_label != null:
+			_physics_debug_label.text = "[PHYSDBG] no_ship"
+		return
+
+	var driver_id: int = ship.driver_peer_id
+	var passenger_lines: Array[String] = []
+	for n: Node in get_tree().get_nodes_in_group("player_controller"):
+		var p: PlayerController = n as PlayerController
+		if p == null:
+			continue
+		var pid: int = p.get_multiplayer_authority()
+		if pid == driver_id:
+			continue
+		var rel: Vector3 = ship.to_local(p.global_position)
+		passenger_lines.append("P%d rel=(%.2f,%.2f,%.2f) vel=%.2f" % [pid, rel.x, rel.y, rel.z, p.velocity.length()])
+
+	var cargo_lines: Array[String] = []
+	for n: Node in get_tree().get_nodes_in_group("cargo_crate"):
+		var c: CargoCrate = n as CargoCrate
+		if c == null:
+			continue
+		if c.holder_peer_id != 0:
+			continue
+		var rel_c: Vector3 = ship.to_local(c.global_position)
+		cargo_lines.append("C rel=(%.2f,%.2f,%.2f) vel=%.2f" % [rel_c.x, rel_c.y, rel_c.z, c.linear_velocity.length()])
+
+	var line: String = "[PHYSDBG] thr=%.2f turn=%.2f ship_ang=(%.2f,%.2f,%.2f) | %s | %s" % [
+		ship.get_throttle(),
+		ship.get_turn_input(),
+		ship.angular_velocity.x, ship.angular_velocity.y, ship.angular_velocity.z,
+		", ".join(passenger_lines),
+		", ".join(cargo_lines)
+	]
+	print(line)
+	if _physics_debug_label != null:
+		_physics_debug_label.text = line
+
+func _get_primary_ship() -> SkyShip:
+	var ships: Array[Node] = get_tree().get_nodes_in_group("sky_ship")
+	for node: Node in ships:
+		var ship: SkyShip = node as SkyShip
+		if ship != null:
+			return ship
+	return null
+
+func _setup_physics_debug_label() -> void:
+	var canvas := CanvasLayer.new()
+	canvas.layer = 100
+	add_child(canvas)
+
+	var label := Label.new()
+	label.position = Vector2(12.0, 72.0)
+	label.size = Vector2(1500.0, 64.0)
+	label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
+	label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
+	label.modulate = Color(1.0, 0.95, 0.7, 0.95)
+	label.text = ""
+	label.visible = false
+	canvas.add_child(label)
+	_physics_debug_label = label

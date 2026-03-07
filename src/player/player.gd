@@ -6,6 +6,22 @@ class_name PlayerController
 @export var deceleration: float = 22.0
 @export var jump_velocity: float = 5.0
 @export var gravity: float = 12.0
+@export var carry_mass_speed_penalty: float = 0.08
+@export var carry_mass_jump_penalty: float = 0.1
+@export var throw_charge_duration: float = 0.9
+@export var throw_speed_min: float = 6.0
+@export var throw_speed_max: float = 24.0
+@export var ragdoll_fall_height: float = 4.5
+@export var ragdoll_fall_impulse_scale: float = 1.1
+@export var ragdoll_duration: float = 1.1
+@export var ragdoll_spin_speed: float = 6.0
+@export var ragdoll_max_duration: float = 3.0
+@export var ragdoll_recover_speed_threshold: float = 0.55
+@export var ragdoll_floor_settle_time: float = 0.4
+@export var ragdoll_ground_friction: float = 8.5
+@export var ragdoll_air_drag: float = 0.8
+@export var ragdoll_onset_tilt_degrees: float = 78.0
+@export var ragdoll_onset_spin_boost: float = 1.8
 
 @export var waddle_tilt_degrees: float = 8.0
 @export var waddle_bob_amount: float = 0.06
@@ -18,6 +34,7 @@ class_name PlayerController
 @export var floor_max_angle_degrees: float = 42.0
 @export var floor_snap_distance: float = 0.45
 @export var ship_latch_duration: float = 0.35
+@export var ship_air_latch_duration: float = 0.75
 @export var ship_probe_distance: float = 1.35
 @export var ship_deck_area_mask: int = 16
 @export var wheel_lock_lerp_speed: float = 12.0
@@ -56,6 +73,14 @@ var _remote_target_visual_basis: Basis = Basis.IDENTITY
 var _remote_target_on_ship: bool = false
 var _remote_target_ship_rel_position: Vector3 = Vector3.ZERO
 var _remote_target_ship_rel_basis: Basis = Basis.IDENTITY
+var _throw_charging: bool = false
+var _throw_charge_time: float = 0.0
+var _is_ragdolled: bool = false
+var _ragdoll_time_remaining: float = 0.0
+var _ragdoll_spin_velocity: Vector3 = Vector3.ZERO
+var _ragdoll_floor_time: float = 0.0
+var _fall_tracking_active: bool = false
+var _fall_start_height: float = 0.0
 
 func _ready() -> void:
 	add_to_group("player_controller")
@@ -92,6 +117,13 @@ func _physics_process(delta: float) -> void:
 	_was_driving = driving_now
 	_drive_collision_grace_remaining = max(0.0, _drive_collision_grace_remaining - delta)
 	_read_input()
+	_update_throw_charge(delta)
+	_update_fall_tracking()
+	if _is_ragdolled:
+		_apply_ragdoll_sim(delta)
+		_update_drive_collision_state(false)
+		sync_state.rpc(global_position, basis, velocity, visual.position, visual.basis, false, Vector3.ZERO, Basis.IDENTITY)
+		return
 	_update_ship_latch_state(delta)
 	_apply_latched_ship_follow(delta)
 	if driving_now:
@@ -131,6 +163,17 @@ func _input(event: InputEvent) -> void:
 
 	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and event.pressed:
 		Input.mouse_mode = Input.MOUSE_MODE_CAPTURED
+		if _can_start_throw():
+			_throw_charging = true
+			_throw_charge_time = 0.0
+			get_viewport().set_input_as_handled()
+			return
+
+	if event is InputEventMouseButton and event.button_index == MOUSE_BUTTON_LEFT and not event.pressed:
+		if _throw_charging:
+			_release_throw()
+			get_viewport().set_input_as_handled()
+			return
 
 	if event is InputEventMouseMotion and Input.mouse_mode == Input.MOUSE_MODE_CAPTURED:
 		_yaw -= event.relative.x * mouse_sensitivity
@@ -155,7 +198,7 @@ func _apply_gravity(delta: float) -> void:
 		velocity.y = 0.0
 
 	if Input.is_action_just_pressed("jump") and is_on_floor():
-		velocity.y = jump_velocity
+		velocity.y = _get_effective_jump_velocity()
 
 func _apply_movement(delta: float) -> void:
 	var cam_basis: Basis = camera.global_transform.basis
@@ -171,7 +214,7 @@ func _apply_movement(delta: float) -> void:
 	if input_dir.length() > 1.0:
 		input_dir = input_dir.normalized()
 
-	var target_vel: Vector3 = input_dir * move_speed
+	var target_vel: Vector3 = input_dir * _get_effective_move_speed()
 	target_vel.y = velocity.y
 
 	var horiz_vel: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
@@ -212,6 +255,8 @@ func _apply_waddle(delta: float) -> void:
 	visual.basis = visual.basis.slerp(target_basis, 1.0 - exp(-14.0 * delta))
 
 func _try_interact() -> void:
+	if _is_ragdolled:
+		return
 	if not Input.is_action_just_pressed("interact"):
 		return
 
@@ -300,9 +345,24 @@ func _respawn() -> void:
 	_wheel_lock_blend_time_remaining = 0.0
 	_drive_collision_grace_remaining = 0.0
 	_clear_ship_latch()
+	_exit_ragdoll()
+	_throw_charging = false
+	_throw_charge_time = 0.0
 	_remote_target_on_ship = false
 	global_position = _spawn_position + Vector3(0.0, 1.0, 0.0)
 	velocity = Vector3.ZERO
+
+@rpc("any_peer", "reliable", "call_local")
+func force_ragdoll_from_server(impulse: Vector3) -> void:
+	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
+		return
+	_enter_ragdoll(impulse)
+
+@rpc("any_peer", "reliable")
+func request_ragdoll_from_hit(impulse: Vector3) -> void:
+	if not multiplayer.is_server():
+		return
+	force_ragdoll_from_server.rpc(impulse)
 
 @rpc("any_peer", "unreliable", "call_remote")
 func sync_state(pos: Vector3, body_basis: Basis, body_velocity: Vector3, visual_pos: Vector3, visual_basis: Basis, on_ship: bool, ship_rel_pos: Vector3, ship_rel_basis: Basis) -> void:
@@ -335,6 +395,9 @@ func _on_session_ended() -> void:
 	_was_driving = false
 	_wheel_lock_blend_time_remaining = 0.0
 	_drive_collision_grace_remaining = 0.0
+	_throw_charging = false
+	_throw_charge_time = 0.0
+	_exit_ragdoll()
 	_clear_ship_latch()
 	_remote_target_on_ship = false
 
@@ -397,6 +460,42 @@ func _apply_drive_control() -> void:
 	var decelerating: bool = Input.is_action_pressed("ship_decelerate")
 	ship.submit_driver_input(turn_input, pitch_input, accelerating, decelerating)
 
+func _update_throw_charge(delta: float) -> void:
+	if not _throw_charging:
+		return
+	if not _can_start_throw():
+		_throw_charging = false
+		_throw_charge_time = 0.0
+		return
+	_throw_charge_time = min(throw_charge_duration, _throw_charge_time + delta)
+
+func _release_throw() -> void:
+	_throw_charging = false
+	if not _can_start_throw():
+		_throw_charge_time = 0.0
+		return
+	var cargo: CargoCrate = _held_cargo
+	var charge_ratio: float = clamp(_throw_charge_time / max(0.01, throw_charge_duration), 0.0, 1.0)
+	_throw_charge_time = 0.0
+	var throw_dir: Vector3 = camera.project_ray_normal(get_aim_screen_position()).normalized()
+	var throw_speed: float = lerp(throw_speed_min, throw_speed_max, charge_ratio)
+	_request_throw(cargo, throw_dir * throw_speed)
+	_held_cargo = null
+
+func _can_start_throw() -> bool:
+	return _held_cargo != null and _held_cargo.is_held_by(multiplayer.get_unique_id()) and not _is_driving() and not _is_ragdolled
+
+func _request_throw(cargo: CargoCrate, throw_velocity: Vector3) -> void:
+	if cargo == null:
+		return
+	var release_transform: Transform3D = cargo.global_transform
+	var release_linear_velocity: Vector3 = cargo.linear_velocity
+	var release_angular_velocity: Vector3 = cargo.angular_velocity
+	if multiplayer.is_server():
+		cargo.request_throw(release_transform, release_linear_velocity, release_angular_velocity, throw_velocity)
+	else:
+		cargo.request_throw.rpc_id(1, release_transform, release_linear_velocity, release_angular_velocity, throw_velocity)
+
 func _lock_to_wheel(delta: float) -> void:
 	if _driving_wheel == null:
 		return
@@ -410,6 +509,96 @@ func _lock_to_wheel(delta: float) -> void:
 	else:
 		global_position = anchor.global_position
 	velocity = Vector3.ZERO
+
+func _get_effective_move_speed() -> float:
+	if _held_cargo == null:
+		return move_speed
+	var held_mass: float = max(0.0, _held_cargo.mass)
+	var scale: float = max(0.28, 1.0 - (held_mass * carry_mass_speed_penalty))
+	return move_speed * scale
+
+func _get_effective_jump_velocity() -> float:
+	if _held_cargo == null:
+		return jump_velocity
+	var held_mass: float = max(0.0, _held_cargo.mass)
+	var scale: float = max(0.25, 1.0 - (held_mass * carry_mass_jump_penalty))
+	return jump_velocity * scale
+
+func _update_fall_tracking() -> void:
+	if _is_ragdolled:
+		_fall_tracking_active = false
+		return
+	if not is_on_floor():
+		if not _fall_tracking_active:
+			_fall_tracking_active = true
+			_fall_start_height = global_position.y
+		return
+	if not _fall_tracking_active:
+		return
+	var fall_distance: float = _fall_start_height - global_position.y
+	_fall_tracking_active = false
+	if fall_distance >= ragdoll_fall_height:
+		var impact_strength: float = clamp(fall_distance * ragdoll_fall_impulse_scale, 2.5, 9.0)
+		var lateral_dir := Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
+		if lateral_dir.length_squared() <= 0.0001:
+			lateral_dir = -basis.z
+		lateral_dir = lateral_dir.normalized()
+		var impact_impulse: Vector3 = (lateral_dir * impact_strength) + Vector3.UP * min(2.0, impact_strength * 0.18)
+		_enter_ragdoll(impact_impulse)
+
+func _apply_ragdoll_sim(delta: float) -> void:
+	_ragdoll_time_remaining = max(0.0, _ragdoll_time_remaining - delta)
+	velocity.y -= gravity * 1.95 * delta
+	if is_on_floor():
+		_ragdoll_floor_time += delta
+		var horiz: Vector3 = Vector3(velocity.x, 0.0, velocity.z)
+		horiz = horiz.lerp(Vector3.ZERO, min(1.0, ragdoll_ground_friction * delta))
+		velocity.x = horiz.x
+		velocity.z = horiz.z
+	else:
+		_ragdoll_floor_time = 0.0
+		velocity.x *= 1.0 / (1.0 + (ragdoll_air_drag * delta * 0.55))
+		velocity.z *= 1.0 / (1.0 + (ragdoll_air_drag * delta * 0.55))
+	move_and_slide()
+	var speed_ratio: float = clamp(velocity.length() / 7.0, 0.85, 1.9)
+	var rot_alpha: float = min(1.0, delta * 17.0 * speed_ratio)
+	var tumble_basis: Basis = Basis.from_euler(_ragdoll_spin_velocity * delta)
+	visual.basis = visual.basis.orthonormalized().slerp((tumble_basis * visual.basis).orthonormalized(), rot_alpha)
+	var can_recover: bool = _ragdoll_time_remaining <= 0.0 and is_on_floor() and _ragdoll_floor_time >= ragdoll_floor_settle_time and velocity.length() <= ragdoll_recover_speed_threshold
+	if can_recover:
+		_exit_ragdoll()
+
+func _enter_ragdoll(impulse: Vector3) -> void:
+	if _is_ragdolled:
+		return
+	if _is_driving():
+		return
+	_is_ragdolled = true
+	var impact_ratio: float = clamp(impulse.length() / 9.0, 0.0, 1.0)
+	_ragdoll_time_remaining = lerp(ragdoll_duration, ragdoll_max_duration, impact_ratio)
+	_ragdoll_floor_time = 0.0
+	_throw_charging = false
+	_throw_charge_time = 0.0
+	var tumble_bias: Vector3 = impulse.normalized() if impulse.length() > 0.001 else Vector3.ZERO
+	_ragdoll_spin_velocity = Vector3(
+		randf_range(-ragdoll_spin_speed, ragdoll_spin_speed) + (tumble_bias.z * ragdoll_spin_speed * 0.65),
+		randf_range(-ragdoll_spin_speed, ragdoll_spin_speed),
+		randf_range(-ragdoll_spin_speed, ragdoll_spin_speed) + (-tumble_bias.x * ragdoll_spin_speed * 0.65)
+	) * lerpf(1.0, ragdoll_onset_spin_boost, impact_ratio)
+	var onset_axis: Vector3 = Vector3(tumble_bias.z, 0.0, -tumble_bias.x)
+	if onset_axis.length_squared() <= 0.0001:
+		onset_axis = Vector3(randf_range(-1.0, 1.0), 0.0, randf_range(-1.0, 1.0))
+	onset_axis = onset_axis.normalized()
+	var onset_tilt: float = deg_to_rad(ragdoll_onset_tilt_degrees) * lerpf(0.7, 1.0, impact_ratio)
+	visual.basis = Basis(onset_axis, onset_tilt) * visual.basis
+	velocity += impulse
+	if impulse.length() > 3.0:
+		velocity.y += min(2.3, impulse.length() * 0.2)
+
+func _exit_ragdoll() -> void:
+	_is_ragdolled = false
+	_ragdoll_time_remaining = 0.0
+	_ragdoll_floor_time = 0.0
 
 func _update_drive_collision_state(driving_now: bool) -> void:
 	var should_disable: bool = driving_now or _drive_collision_grace_remaining > 0.0
@@ -453,6 +642,7 @@ func _apply_latched_ship_follow(delta: float) -> void:
 	var current_ship_transform: Transform3D = _latched_ship.global_transform
 	var ship_delta: Transform3D = current_ship_transform * _latched_ship_transform.affine_inverse()
 	global_position = ship_delta * global_position
+	basis = (ship_delta.basis * basis).orthonormalized()
 
 	_latched_ship_transform = current_ship_transform
 
@@ -474,7 +664,7 @@ func _update_ship_latch_state(delta: float) -> void:
 		_latched_ship = ship
 		_latched_ship_transform = ship.global_transform
 	_latched_ship = ship
-	_ship_latch_time_remaining = ship_latch_duration
+	_ship_latch_time_remaining = ship_latch_duration if is_on_floor() else ship_air_latch_duration
 
 func _clear_ship_latch() -> void:
 	_latched_ship = null
@@ -494,7 +684,14 @@ func _probe_ship_below() -> SkyShip:
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		return null
-	return hit.get("collider") as SkyShip
+	var collider: Object = hit.get("collider")
+	var ship: SkyShip = collider as SkyShip
+	if ship != null:
+		return ship
+	var cargo: CargoCrate = collider as CargoCrate
+	if cargo != null:
+		return cargo.get_latched_ship()
+	return null
 
 func _probe_ship_below_at(sample_position: Vector3) -> SkyShip:
 	var ship_from_area: SkyShip = _probe_ship_deck_area_at(sample_position)
@@ -510,7 +707,14 @@ func _probe_ship_below_at(sample_position: Vector3) -> SkyShip:
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		return null
-	return hit.get("collider") as SkyShip
+	var collider: Object = hit.get("collider")
+	var ship: SkyShip = collider as SkyShip
+	if ship != null:
+		return ship
+	var cargo: CargoCrate = collider as CargoCrate
+	if cargo != null:
+		return cargo.get_latched_ship()
+	return null
 
 func _probe_ship_deck_area_at(sample_position: Vector3) -> SkyShip:
 	var params := PhysicsPointQueryParameters3D.new()

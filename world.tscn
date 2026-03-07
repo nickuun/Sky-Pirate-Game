@@ -6,7 +6,7 @@
 [ext_resource type="PackedScene" path="res://src/ui/ui_pause.tscn" id="4_ivb8m"]
 [ext_resource type="PackedScene" uid="uid://cvl73ob2vbko4" path="res://src/ship/ship.tscn" id="5_pk5m8"]
 [ext_resource type="PackedScene" path="res://src/ui/ui_interaction.tscn" id="6_r36rn"]
-[ext_resource type="Script" path="res://src/ui/ui_fps.gd" id="7_fpsui"]
+[ext_resource type="Script" uid="uid://bqc3q3meu8bd7" path="res://src/ui/ui_fps.gd" id="7_fpsui"]
 [ext_resource type="PackedScene" uid="uid://c2kcr08rr2fx0" path="res://assets/FreeSample/PalmTree.fbx" id="8_ic0uy"]
 [ext_resource type="PackedScene" uid="uid://cdg7v5adypim" path="res://assets/FreeSample/Rock_4.fbx" id="9_k3n1d"]
 [ext_resource type="PackedScene" uid="uid://buskgqny0vtno" path="res://assets/FreeSample/Lantern_1.fbx" id="10_2o6r5"]
@@ -67,10 +67,10 @@ cloud_count = 44
 area_extent = 120.0
 max_height = 50.0
 drift_speed = 0.22
-fade_edge_fraction = 0.28
 min_boxes_per_cloud = 6
 max_boxes_per_cloud = 12
 cloud_spread = 5.6
+fade_edge_fraction = 0.28
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=535501066]
 transform = Transform3D(15, 0, 0, 0, 15, 0, 0, 0, 15, 0.6442001, -2.8369308, -1.3342867)
@@ -111,7 +111,7 @@ mesh = SubResource("BoxMesh_gv5m4")
 surface_material_override/0 = SubResource("StandardMaterial3D_ground")
 
 [node name="SkyShip" parent="." unique_id=553199057 instance=ExtResource("5_pk5m8")]
-transform = Transform3D(0.999244, 0, 0.0388812, 0, 1, 0, -0.0388812, 0, 0.999244, 1.8064594, 32.10188, 4.265871)
+transform = Transform3D(1.9984876, 0, 0.077762395, 0.016208861, 1.95607, -0.41656655, -0.07605434, 0.41688177, 1.9545908, -7.1682577, 34.75384, 3.001381)
 
 [node name="CargoCrate" parent="." unique_id=1588129755 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0292387, 33.306114, -5.178396)
@@ -152,7 +152,6 @@ spawn_path = NodePath("../Players")
 [node name="UIInteraction" parent="UI" unique_id=1652084970 instance=ExtResource("6_r36rn")]
 
 [node name="FPS" type="Label" parent="UI" unique_id=1140855730]
-layout_mode = 1
 anchors_preset = 1
 anchor_left = 1.0
 anchor_right = 1.0
@@ -162,8 +161,8 @@ offset_right = -10.0
 offset_bottom = 36.0
 grow_horizontal = 0
 theme_override_font_sizes/font_size = 16
-horizontal_alignment = 2
 text = "FPS: 0"
+horizontal_alignment = 2
 script = ExtResource("7_fpsui")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=570198560]

@@ -20,10 +20,6 @@ boot_splash/defaults/default_clear_color=Color(0.18373618, 0.26078427, 0.6120255
 
 Network="*uid://e5tpt2rnvq6r"
 
-[display]
-
-window/size/mode=4
-
 [input]
 
 move_forward={

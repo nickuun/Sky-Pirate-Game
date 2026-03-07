@@ -10,9 +10,13 @@ class_name CargoCrate
 @export var ship_deck_area_mask: int = 16
 @export var ship_carry_lerp_speed: float = 18.0
 @export var ship_latch_duration: float = 0.25
-@export var ship_turn_drift_compensation: float = -5
-@export var ship_turn_drift_compensation_right_scale: float = 3
-@export var ship_throttle_drift_compensation: float = 1.25
+@export var ship_latch_capture_speed: float = 3.6
+@export var max_carry_speed: float = 8.5
+@export var ship_surface_grip: float = 42.0
+@export var ship_anchor_strength: float = 10.0
+@export var ship_anchor_deadzone: float = 0.025
+@export var player_impact_ragdoll_speed: float = 4.8
+@export var player_impact_impulse_scale: float = 0.48
 
 var holder_path: NodePath = NodePath("")
 var holder_peer_id: int = 0
@@ -28,9 +32,11 @@ var _target_on_ship: bool = false
 var _target_ship_relative_transform: Transform3D = Transform3D.IDENTITY
 var _latched_ship: SkyShip = null
 var _latched_ship_transform: Transform3D = Transform3D.IDENTITY
+var _latched_ship_local_anchor: Vector3 = Vector3.ZERO
+var _latched_ship_local_basis: Basis = Basis.IDENTITY
 var _ship_latch_time_remaining: float = 0.0
 var _spawn_transform: Transform3D = Transform3D.IDENTITY
-var _last_latched_ship_throttle: float = 0.0
+var _impact_cooldown: float = 0.0
 
 func _ready() -> void:
 	_default_collision_layer = collision_layer
@@ -49,6 +55,7 @@ func is_held_by(peer_id: int) -> bool:
 func _physics_process(delta: float) -> void:
 	if is_multiplayer_authority():
 		_run_authoritative_physics(delta)
+		_update_player_impact_ragdoll(delta)
 		var support_ship: SkyShip = _find_support_ship()
 		var on_ship: bool = support_ship != null and holder_path.is_empty()
 		var relative_transform: Transform3D = Transform3D.IDENTITY
@@ -86,7 +93,7 @@ func _limit_motion() -> void:
 	if angular_velocity.length() > max_angular_speed:
 		angular_velocity = angular_velocity.normalized() * max_angular_speed
 
-func _apply_ship_carry(delta: float) -> void:
+func _apply_ship_carry(_delta: float) -> void:
 	if _latched_ship == null or not is_instance_valid(_latched_ship):
 		_clear_ship_latch()
 		return
@@ -94,45 +101,38 @@ func _apply_ship_carry(delta: float) -> void:
 		_clear_ship_latch()
 		return
 
+	# Passenger-style follow: apply exact ship delta transform while latched.
+	# This removes turning drift entirely and keeps cargo aligned with deck motion.
 	var current_ship_transform: Transform3D = _latched_ship.global_transform
 	var ship_delta: Transform3D = current_ship_transform * _latched_ship_transform.affine_inverse()
-	var target_position: Vector3 = ship_delta * global_position
-	var carry_velocity: Vector3 = (target_position - global_position) / max(0.0001, delta)
-	linear_velocity = carry_velocity
-	_apply_turn_drift_compensation(delta)
-	_apply_throttle_drift_compensation()
+	global_position = ship_delta * global_position
+	# Match ship-relative orientation exactly while latched (same idea as passenger follow).
+	global_basis = (_latched_ship.global_basis * _latched_ship_local_basis).orthonormalized()
+
+	# Kill deck-plane velocity while latched (keep only ship-up component).
+	# This prevents acceleration/turn drift from integrating into forward slide.
+	var ship_basis: Basis = _latched_ship.global_basis
+	var planar_rel: Vector3 = (ship_basis.x * linear_velocity.dot(ship_basis.x)) + (ship_basis.z * linear_velocity.dot(ship_basis.z))
+	var grip_alpha: float = min(1.0, _delta * ship_surface_grip)
+	linear_velocity -= planar_rel * grip_alpha
+	# Preserve only world-vertical velocity while latched.
+	# Using ship-up here leaks forward/back velocity whenever the ship pitches.
+	linear_velocity = Vector3(0.0, linear_velocity.y, 0.0)
+
+	# Softly keep cargo near where it first latched on deck so bounce jitter doesn't walk it forward.
+	var current_local: Vector3 = _latched_ship.to_local(global_position)
+	var planar_error_local: Vector3 = Vector3(
+		_latched_ship_local_anchor.x - current_local.x,
+		0.0,
+		_latched_ship_local_anchor.z - current_local.z
+	)
+	if planar_error_local.length() > ship_anchor_deadzone:
+		var anchor_alpha: float = min(1.0, _delta * ship_anchor_strength)
+		var planar_correction_world: Vector3 = (_latched_ship.global_basis * planar_error_local) * anchor_alpha
+		global_position += planar_correction_world
+	linear_velocity = linear_velocity.limit_length(max_carry_speed)
+	angular_velocity = angular_velocity.limit_length(max_angular_speed)
 	_latched_ship_transform = current_ship_transform
-	_last_latched_ship_throttle = _latched_ship.get_throttle()
-
-func _apply_turn_drift_compensation(delta: float) -> void:
-	if _latched_ship == null or not is_instance_valid(_latched_ship):
-		return
-
-	var turn_input: float = _latched_ship.get_turn_input()
-	if abs(turn_input) <= 0.001:
-		return
-
-	# Direct steering-based counter-push.
-	# A (-1) pushes cargo forward on ship, D (+1) pushes it backward.
-	var compensation: float = ship_turn_drift_compensation
-	if turn_input > 0.0:
-		compensation *= ship_turn_drift_compensation_right_scale
-	linear_velocity += (_latched_ship.global_basis.z * turn_input) * compensation * delta
-
-func _apply_throttle_drift_compensation() -> void:
-	if _latched_ship == null or not is_instance_valid(_latched_ship):
-		return
-	var current_throttle: float = _latched_ship.get_throttle()
-	var throttle_delta: float = current_throttle - _last_latched_ship_throttle
-	if abs(throttle_delta) <= 0.0001:
-		return
-	# Counter inertia lag from throttle changes (accel/decel) along ship forward axis.
-	linear_velocity += (-_latched_ship.global_basis.z) * (throttle_delta * cruise_equivalent_speed() * ship_throttle_drift_compensation)
-
-func cruise_equivalent_speed() -> float:
-	if _latched_ship == null or not is_instance_valid(_latched_ship):
-		return 0.0
-	return _latched_ship.cruise_speed
 
 func apply_remote_state(delta: float) -> void:
 	freeze = true
@@ -196,8 +196,56 @@ func request_drop(release_transform: Transform3D, release_linear_velocity: Vecto
 	# Return cargo simulation authority to server once released.
 	call_deferred("_deferred_return_authority_to_server")
 
+@rpc("any_peer", "reliable")
+func request_throw(release_transform: Transform3D, release_linear_velocity: Vector3, release_angular_velocity: Vector3, throw_velocity: Vector3) -> void:
+	if not multiplayer.is_server():
+		return
+
+	var sender_id: int = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	if holder_peer_id != sender_id:
+		return
+
+	global_transform = release_transform
+	linear_velocity = release_linear_velocity + throw_velocity
+	angular_velocity = release_angular_velocity + Vector3(
+		randf_range(-4.0, 4.0),
+		randf_range(-4.0, 4.0),
+		randf_range(-4.0, 4.0)
+	)
+	_target_transform = global_transform
+	_target_linear_velocity = linear_velocity
+	_target_angular_velocity = angular_velocity
+	set_holder.rpc(NodePath(""), 0)
+	call_deferred("_deferred_return_authority_to_server")
+
 func _deferred_return_authority_to_server() -> void:
 	set_sim_authority.rpc(1)
+
+func _update_player_impact_ragdoll(delta: float) -> void:
+	_impact_cooldown = max(0.0, _impact_cooldown - delta)
+	if _impact_cooldown > 0.0:
+		return
+	if holder_peer_id != 0:
+		return
+	if linear_velocity.length() < player_impact_ragdoll_speed:
+		return
+	var bodies: Array[Node3D] = get_colliding_bodies()
+	for body: Node3D in bodies:
+		var player: PlayerController = body as PlayerController
+		if player == null:
+			continue
+		var relative_velocity: Vector3 = linear_velocity - player.velocity
+		if relative_velocity.length() < player_impact_ragdoll_speed:
+			continue
+		var impulse: Vector3 = relative_velocity * player_impact_impulse_scale
+		if multiplayer.is_server():
+			player.force_ragdoll_from_server.rpc(impulse)
+		else:
+			player.request_ragdoll_from_hit.rpc_id(1, impulse)
+		_impact_cooldown = 0.35
+		return
 
 @rpc("any_peer", "reliable", "call_local")
 func set_holder(target_holder_path: NodePath, target_peer_id: int) -> void:
@@ -356,14 +404,17 @@ func _update_ship_latch_state(delta: float) -> void:
 	if _latched_ship == null or _latched_ship != ship:
 		_latched_ship = ship
 		_latched_ship_transform = ship.global_transform
-		_last_latched_ship_throttle = ship.get_throttle()
+		_latched_ship_local_anchor = ship.to_local(global_position)
+		_latched_ship_local_basis = (ship.global_basis.inverse() * global_basis).orthonormalized()
+	if linear_velocity.length() > ship_latch_capture_speed:
+		# Don't instantly "stick" high-speed throws on first contact.
+		return
 	_latched_ship = ship
 	_ship_latch_time_remaining = ship_latch_duration
 
 func _clear_ship_latch() -> void:
 	_latched_ship = null
 	_ship_latch_time_remaining = 0.0
-	_last_latched_ship_throttle = 0.0
 
 func _find_contact_ship() -> SkyShip:
 	var bodies: Array[Node3D] = get_colliding_bodies()
@@ -374,22 +425,25 @@ func _find_contact_ship() -> SkyShip:
 	return null
 
 func _find_support_ship() -> SkyShip:
-	return _find_contact_ship()
+	var ship: SkyShip = _find_contact_ship()
+	if ship != null:
+		return ship
 
-func _probe_ship_deck_area_at(sample_position: Vector3) -> SkyShip:
-	var params := PhysicsPointQueryParameters3D.new()
-	params.position = sample_position + Vector3(0.0, -0.2, 0.0)
-	params.collide_with_areas = true
-	params.collide_with_bodies = false
-	params.collision_mask = ship_deck_area_mask
-	var hits: Array[Dictionary] = get_world_3d().direct_space_state.intersect_point(params, 8)
-	for hit: Dictionary in hits:
-		var area: ShipDeckArea = hit.get("collider") as ShipDeckArea
-		if area == null:
+	# Do not latch from deck-area probes alone: that "catches" mid-air cargo and causes moon-gravity float.
+	# Latch only from physical contact with ship/cargo.
+	var bodies: Array[Node3D] = get_colliding_bodies()
+	for body: Node3D in bodies:
+		var other_cargo: CargoCrate = body as CargoCrate
+		if other_cargo == null:
 			continue
-		var ship: SkyShip = area.get_ship()
-		if ship != null:
-			return ship
+		var other_ship: SkyShip = other_cargo.get_latched_ship()
+		if other_ship != null:
+			return other_ship
+	return null
+
+func get_latched_ship() -> SkyShip:
+	if _latched_ship != null and is_instance_valid(_latched_ship):
+		return _latched_ship
 	return null
 
 func _get_primary_ship() -> SkyShip:
