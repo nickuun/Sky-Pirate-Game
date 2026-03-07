@@ -9,12 +9,13 @@ class_name CargoCrate
 @export var sync_position_deadzone: float = 0.03
 @export var ship_deck_area_mask: int = 16
 @export var ship_carry_lerp_speed: float = 18.0
-@export var ship_latch_duration: float = 0.25
-@export var ship_latch_capture_speed: float = 3.6
+@export var ship_latching_enabled: bool = true
+@export var ship_latch_duration: float = 0.16
+@export var ship_latch_capture_speed: float = 0.9
 @export var max_carry_speed: float = 8.5
-@export var ship_surface_grip: float = 42.0
-@export var ship_anchor_strength: float = 10.0
-@export var ship_anchor_deadzone: float = 0.025
+@export var ship_surface_grip: float = 3.5
+@export var ship_anchor_strength: float = 0.15
+@export var ship_anchor_deadzone: float = 0.18
 @export var player_impact_ragdoll_speed: float = 4.8
 @export var player_impact_impulse_scale: float = 0.48
 
@@ -94,30 +95,29 @@ func _limit_motion() -> void:
 		angular_velocity = angular_velocity.normalized() * max_angular_speed
 
 func _apply_ship_carry(_delta: float) -> void:
+	if not ship_latching_enabled:
+		_clear_ship_latch()
+		return
 	if _latched_ship == null or not is_instance_valid(_latched_ship):
 		_clear_ship_latch()
 		return
-	if _ship_latch_time_remaining <= 0.0:
+	# Require active contact to stay latched; otherwise count down fast and bail.
+	var touching_ship: bool = _find_contact_ship() != null
+	if not touching_ship:
+		_ship_latch_time_remaining = max(0.0, _ship_latch_time_remaining - (_delta * 3.0))
+	if _ship_latch_time_remaining <= 0.0 or not touching_ship:
 		_clear_ship_latch()
 		return
 
-	# Passenger-style follow: apply exact ship delta transform while latched.
-	# This removes turning drift entirely and keeps cargo aligned with deck motion.
-	var current_ship_transform: Transform3D = _latched_ship.global_transform
-	var ship_delta: Transform3D = current_ship_transform * _latched_ship_transform.affine_inverse()
-	global_position = ship_delta * global_position
-	# Match ship-relative orientation exactly while latched (same idea as passenger follow).
-	global_basis = (_latched_ship.global_basis * _latched_ship_local_basis).orthonormalized()
-
-	# Kill deck-plane velocity while latched (keep only ship-up component).
-	# This prevents acceleration/turn drift from integrating into forward slide.
+	# Keep crate rotation free; only slight planar damping to avoid runaway slide.
 	var ship_basis: Basis = _latched_ship.global_basis
-	var planar_rel: Vector3 = (ship_basis.x * linear_velocity.dot(ship_basis.x)) + (ship_basis.z * linear_velocity.dot(ship_basis.z))
+	var planar_rel: Vector3 = linear_velocity - ship_basis.y * linear_velocity.dot(ship_basis.y)
 	var grip_alpha: float = min(1.0, _delta * ship_surface_grip)
-	linear_velocity -= planar_rel * grip_alpha
-	# Preserve only world-vertical velocity while latched.
-	# Using ship-up here leaks forward/back velocity whenever the ship pitches.
-	linear_velocity = Vector3(0.0, linear_velocity.y, 0.0)
+	linear_velocity -= planar_rel * grip_alpha * 0.18
+	# Inherit a bit of ship velocity without overshooting the bow.
+	var ship_linear: Vector3 = _latched_ship.linear_velocity
+	var inherit_alpha: float = min(1.0, _delta * 0.6)
+	linear_velocity = linear_velocity.lerp(ship_linear, inherit_alpha)
 
 	# Softly keep cargo near where it first latched on deck so bounce jitter doesn't walk it forward.
 	var current_local: Vector3 = _latched_ship.to_local(global_position)
@@ -132,7 +132,6 @@ func _apply_ship_carry(_delta: float) -> void:
 		global_position += planar_correction_world
 	linear_velocity = linear_velocity.limit_length(max_carry_speed)
 	angular_velocity = angular_velocity.limit_length(max_angular_speed)
-	_latched_ship_transform = current_ship_transform
 
 func apply_remote_state(delta: float) -> void:
 	freeze = true
