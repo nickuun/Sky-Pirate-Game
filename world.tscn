@@ -25,7 +25,7 @@ size = Vector3(1, 0.2, 1)
 size = Vector3(1, 0.2, 1)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ground"]
-albedo_color = Color(0.22, 0.62, 0.4, 1)
+albedo_color = Color(0.35328037, 0.6107221, 0.19379672, 1)
 roughness = 0.85
 
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_7j3lk"]
@@ -78,11 +78,6 @@ transform = Transform3D(0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0,
 shape = SubResource("BoxShape3D_f3sb7")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1510582517]
-transform = Transform3D(0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 2.1468232, 0)
-mesh = SubResource("BoxMesh_gv5m4")
-surface_material_override/0 = SubResource("StandardMaterial3D_ground")
-
-[node name="MeshInstance3D2" type="MeshInstance3D" parent="Ground" unique_id=1051371574]
 transform = Transform3D(0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0, 2.1468232, 0)
 mesh = SubResource("BoxMesh_gv5m4")
 surface_material_override/0 = SubResource("StandardMaterial3D_ground")

@@ -11,6 +11,11 @@ class_name PlayerController
 @export var throw_charge_duration: float = 0.9
 @export var throw_speed_min: float = 6.0
 @export var throw_speed_max: float = 24.0
+@export var hold_swing_velocity_gain: float = 1.25
+@export var max_hold_swing_velocity: float = 22.0
+@export var cargo_push_base_force: float = 1.0
+@export var cargo_push_impulse_scale: float = 1.2
+@export var cargo_push_max_impulse: float = 4.8
 @export var ragdoll_fall_height: float = 4.5
 @export var ragdoll_fall_impulse_scale: float = 1.1
 @export var ragdoll_duration: float = 1.1
@@ -47,6 +52,7 @@ class_name PlayerController
 @export var aim_screen_offset: Vector2 = Vector2.ZERO
 
 @onready var visual: Node3D = $Visual
+@onready var body_collision: CollisionShape3D = $CapsuleShape3D
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var camera: Camera3D = $CameraPivot/SpringArm3D/Camera3D
 @onready var hold_point: Marker3D = $CameraPivot/HoldPoint
@@ -84,6 +90,10 @@ var _ragdoll_spin_velocity: Vector3 = Vector3.ZERO
 var _ragdoll_floor_time: float = 0.0
 var _fall_tracking_active: bool = false
 var _fall_start_height: float = 0.0
+var _hold_point_prev_global: Vector3 = Vector3.ZERO
+var _hold_point_velocity: Vector3 = Vector3.ZERO
+var _hold_point_tracking_ready: bool = false
+var _default_body_collision_transform: Transform3D = Transform3D.IDENTITY
 
 func _ready() -> void:
 	add_to_group("player_controller")
@@ -101,6 +111,8 @@ func _ready() -> void:
 	_remote_target_velocity = velocity
 	_remote_target_visual_position = visual.position
 	_remote_target_visual_basis = visual.basis
+	if body_collision != null:
+		_default_body_collision_transform = body_collision.transform
 	Network.server_started.connect(_on_session_started)
 	Network.connected_to_server.connect(_on_session_started)
 	Network.disconnected.connect(_on_session_ended)
@@ -119,6 +131,7 @@ func _physics_process(delta: float) -> void:
 		_drive_collision_grace_remaining = drive_collision_grace_duration
 	_was_driving = driving_now
 	_drive_collision_grace_remaining = max(0.0, _drive_collision_grace_remaining - delta)
+	_update_hold_point_kinematics(delta)
 	_read_input()
 	_update_throw_charge(delta)
 	_update_fall_tracking()
@@ -142,8 +155,10 @@ func _physics_process(delta: float) -> void:
 		_lock_to_wheel(delta)
 	else:
 		move_and_slide()
+		_apply_cargo_push_contacts()
 		_refresh_ship_hull_contact()
 		_update_ship_latch_state(0.0)
+		_restore_body_collision_transform(delta)
 	_update_drive_collision_state(driving_now)
 
 	var support_ship: SkyShip = _get_sync_support_ship()
@@ -319,7 +334,7 @@ func _request_pickup(cargo: CargoCrate) -> void:
 
 func _request_drop(cargo: CargoCrate) -> void:
 	var release_transform: Transform3D = cargo.global_transform
-	var release_linear_velocity: Vector3 = cargo.linear_velocity
+	var release_linear_velocity: Vector3 = _compose_cargo_release_velocity()
 	var release_angular_velocity: Vector3 = cargo.angular_velocity
 	if multiplayer.is_server():
 		cargo.request_drop(release_transform, release_linear_velocity, release_angular_velocity)
@@ -369,6 +384,10 @@ func _respawn() -> void:
 	_throw_charging = false
 	_throw_charge_time = 0.0
 	_remote_target_on_ship = false
+	_hold_point_tracking_ready = false
+	_hold_point_velocity = Vector3.ZERO
+	if body_collision != null:
+		body_collision.transform = _default_body_collision_transform
 	global_position = _spawn_position + Vector3(0.0, 1.0, 0.0)
 	velocity = Vector3.ZERO
 
@@ -420,6 +439,10 @@ func _on_session_ended() -> void:
 	_exit_ragdoll()
 	_clear_ship_latch()
 	_remote_target_on_ship = false
+	_hold_point_tracking_ready = false
+	_hold_point_velocity = Vector3.ZERO
+	if body_collision != null:
+		body_collision.transform = _default_body_collision_transform
 
 func _is_session_active() -> bool:
 	return Network.session_active
@@ -509,7 +532,7 @@ func _request_throw(cargo: CargoCrate, throw_velocity: Vector3) -> void:
 	if cargo == null:
 		return
 	var release_transform: Transform3D = cargo.global_transform
-	var release_linear_velocity: Vector3 = cargo.linear_velocity
+	var release_linear_velocity: Vector3 = _compose_cargo_release_velocity()
 	var release_angular_velocity: Vector3 = cargo.angular_velocity
 	if multiplayer.is_server():
 		cargo.request_throw(release_transform, release_linear_velocity, release_angular_velocity, throw_velocity)
@@ -531,18 +554,57 @@ func _lock_to_wheel(delta: float) -> void:
 	velocity = Vector3.ZERO
 
 func _get_effective_move_speed() -> float:
-	if _held_cargo == null:
-		return move_speed
-	var held_mass: float = max(0.0, _held_cargo.mass)
-	var scale: float = max(0.28, 1.0 - (held_mass * carry_mass_speed_penalty))
-	return move_speed * scale
+	return move_speed
 
 func _get_effective_jump_velocity() -> float:
-	if _held_cargo == null:
-		return jump_velocity
-	var held_mass: float = max(0.0, _held_cargo.mass)
-	var scale: float = max(0.25, 1.0 - (held_mass * carry_mass_jump_penalty))
-	return jump_velocity * scale
+	return jump_velocity
+
+func _compose_cargo_release_velocity() -> Vector3:
+	var swing_velocity: Vector3 = _hold_point_velocity * hold_swing_velocity_gain
+	swing_velocity = swing_velocity.limit_length(max_hold_swing_velocity)
+	return velocity + swing_velocity
+
+func _update_hold_point_kinematics(delta: float) -> void:
+	if hold_point == null:
+		return
+	var current_hold_point: Vector3 = hold_point.global_position
+	if not _hold_point_tracking_ready:
+		_hold_point_prev_global = current_hold_point
+		_hold_point_velocity = Vector3.ZERO
+		_hold_point_tracking_ready = true
+		return
+	_hold_point_velocity = (current_hold_point - _hold_point_prev_global) / max(0.0001, delta)
+	_hold_point_prev_global = current_hold_point
+
+func _apply_cargo_push_contacts() -> void:
+	var collision_count: int = get_slide_collision_count()
+	for i: int in range(collision_count):
+		var collision: KinematicCollision3D = get_slide_collision(i)
+		if collision == null:
+			continue
+		var cargo: CargoCrate = collision.get_collider() as CargoCrate
+		if cargo == null:
+			continue
+		if not cargo.holder_paths.is_empty():
+			continue
+		var push_dir: Vector3 = Vector3(-collision.get_normal().x, 0.0, -collision.get_normal().z)
+		if push_dir.length_squared() <= 0.0001:
+			push_dir = cargo.global_position - global_position
+			push_dir.y = 0.0
+		if push_dir.length_squared() <= 0.0001:
+			continue
+		push_dir = push_dir.normalized()
+		var speed_into: float = max(0.0, Vector3(velocity.x, 0.0, velocity.z).dot(push_dir))
+		var impulse_mag: float = clamp((cargo_push_base_force + speed_into) * cargo_push_impulse_scale, 0.0, cargo_push_max_impulse)
+		if impulse_mag <= 0.01:
+			continue
+		var impulse: Vector3 = push_dir * impulse_mag
+		var contact_point: Vector3 = collision.get_position()
+		if multiplayer.is_server():
+			cargo.request_player_push(impulse, contact_point)
+		else:
+			cargo.request_player_push.rpc_id(1, impulse, contact_point)
+
 
 func _update_fall_tracking() -> void:
 	if _is_ragdolled:
@@ -584,6 +646,7 @@ func _apply_ragdoll_sim(delta: float) -> void:
 	var rot_alpha: float = min(1.0, delta * 17.0 * speed_ratio)
 	var tumble_basis: Basis = Basis.from_euler(_ragdoll_spin_velocity * delta)
 	visual.basis = visual.basis.orthonormalized().slerp((tumble_basis * visual.basis).orthonormalized(), rot_alpha)
+	_sync_ragdoll_collision_to_visual(delta)
 	var can_recover: bool = _ragdoll_time_remaining <= 0.0 and is_on_floor() and _ragdoll_floor_time >= ragdoll_floor_settle_time and velocity.length() <= ragdoll_recover_speed_threshold
 	if can_recover:
 		_exit_ragdoll()
@@ -619,6 +682,21 @@ func _exit_ragdoll() -> void:
 	_is_ragdolled = false
 	_ragdoll_time_remaining = 0.0
 	_ragdoll_floor_time = 0.0
+	if body_collision != null:
+		body_collision.transform = _default_body_collision_transform
+
+func _sync_ragdoll_collision_to_visual(delta: float) -> void:
+	if body_collision == null:
+		return
+	var target_transform: Transform3D = body_collision.transform
+	target_transform.origin = _default_body_collision_transform.origin + (visual.position * 0.6)
+	target_transform.basis = visual.basis.orthonormalized()
+	body_collision.transform = body_collision.transform.interpolate_with(target_transform, min(1.0, delta * 12.0))
+
+func _restore_body_collision_transform(delta: float) -> void:
+	if body_collision == null:
+		return
+	body_collision.transform = body_collision.transform.interpolate_with(_default_body_collision_transform, min(1.0, delta * 14.0))
 
 func _update_drive_collision_state(driving_now: bool) -> void:
 	var should_disable: bool = driving_now or _drive_collision_grace_remaining > 0.0
@@ -647,6 +725,10 @@ func _apply_remote_state(delta: float) -> void:
 	velocity = _remote_target_velocity
 	visual.position = visual.position.lerp(_remote_target_visual_position, pos_alpha)
 	visual.basis = visual.basis.orthonormalized().slerp(_remote_target_visual_basis.orthonormalized(), rot_alpha)
+	if _is_ragdolled:
+		_sync_ragdoll_collision_to_visual(delta)
+	else:
+		_restore_body_collision_transform(delta)
 
 func _apply_latched_ship_follow(delta: float) -> void:
 	if _is_driving():

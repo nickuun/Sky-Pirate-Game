@@ -18,9 +18,12 @@ class_name CargoCrate
 @export var ship_anchor_deadzone: float = 0.18
 @export var player_impact_ragdoll_speed: float = 4.8
 @export var player_impact_impulse_scale: float = 0.48
+@export var player_push_impulse_scale: float = 0.95
+@export var max_player_push_impulse: float = 5.5
 
 var holder_path: NodePath = NodePath("")
 var holder_peer_id: int = 0
+var holder_paths: Dictionary = {}
 var sim_peer_id: int = 1
 var _default_collision_layer: int = 0
 var _default_collision_mask: int = 0
@@ -38,6 +41,7 @@ var _latched_ship_local_basis: Basis = Basis.IDENTITY
 var _ship_latch_time_remaining: float = 0.0
 var _spawn_transform: Transform3D = Transform3D.IDENTITY
 var _impact_cooldown: float = 0.0
+var _snap_to_next_sync: bool = false
 
 func _ready() -> void:
 	_default_collision_layer = collision_layer
@@ -51,14 +55,14 @@ func _ready() -> void:
 	_apply_hold_collision_state()
 
 func is_held_by(peer_id: int) -> bool:
-	return holder_peer_id == peer_id and not holder_path.is_empty()
+	return holder_paths.has(peer_id)
 
 func _physics_process(delta: float) -> void:
 	if is_multiplayer_authority():
 		_run_authoritative_physics(delta)
 		_update_player_impact_ragdoll(delta)
 		var support_ship: SkyShip = _find_support_ship()
-		var on_ship: bool = support_ship != null and holder_path.is_empty()
+		var on_ship: bool = support_ship != null and holder_paths.is_empty()
 		var relative_transform: Transform3D = Transform3D.IDENTITY
 		if on_ship:
 			relative_transform = support_ship.global_transform.affine_inverse() * global_transform
@@ -68,23 +72,33 @@ func _physics_process(delta: float) -> void:
 		apply_remote_state(delta)
 
 func _run_authoritative_physics(delta: float) -> void:
-	if holder_path.is_empty() or not has_node(holder_path):
+	if _prune_invalid_holders():
+		_refresh_primary_holder_cache()
+		sync_holders.rpc(holder_paths.duplicate(true))
+		_update_hold_authority()
+
+	var holders: Array[Node3D] = _get_holder_nodes()
+	if holders.is_empty():
+		if not holder_paths.is_empty():
+			holder_paths.clear()
+			_refresh_primary_holder_cache()
+			sync_holders.rpc(holder_paths.duplicate(true))
+			_update_hold_authority()
 		freeze = false
 		_update_ship_latch_state(delta)
 		_apply_ship_carry(delta)
 		_limit_motion()
 		return
 
-	var holder: Node3D = get_node(holder_path) as Node3D
-	if holder == null:
-		freeze = false
-		_clear_ship_latch()
-		return
-
 	freeze = true
 	_clear_ship_latch()
-	global_basis = global_basis.orthonormalized().slerp(holder.global_basis.orthonormalized(), min(1.0, delta * 12.0))
-	_move_held_towards(holder.global_position, delta)
+	var primary_holder: Node3D = holders[0]
+	var target_position: Vector3 = Vector3.ZERO
+	for holder: Node3D in holders:
+		target_position += holder.global_position
+	target_position /= float(max(1, holders.size()))
+	global_basis = global_basis.orthonormalized().slerp(primary_holder.global_basis.orthonormalized(), min(1.0, delta * 12.0))
+	_move_held_towards(target_position, delta)
 	linear_velocity = Vector3.ZERO
 	angular_velocity = Vector3.ZERO
 
@@ -166,12 +180,13 @@ func request_pickup(target_holder_path: NodePath) -> void:
 	if sender_id == 0:
 		sender_id = multiplayer.get_unique_id()
 
-	if holder_peer_id != 0 and holder_peer_id != sender_id:
+	if target_holder_path.is_empty() or not has_node(target_holder_path):
 		return
 
-	# While held, make the holder peer authoritative for responsive local carry.
-	set_sim_authority.rpc(sender_id)
-	set_holder.rpc(target_holder_path, sender_id)
+	holder_paths[sender_id] = target_holder_path
+	_refresh_primary_holder_cache()
+	sync_holders.rpc(holder_paths.duplicate(true))
+	_update_hold_authority()
 
 @rpc("any_peer", "reliable")
 func request_drop(release_transform: Transform3D, release_linear_velocity: Vector3, release_angular_velocity: Vector3) -> void:
@@ -181,19 +196,26 @@ func request_drop(release_transform: Transform3D, release_linear_velocity: Vecto
 	var sender_id: int = multiplayer.get_remote_sender_id()
 	if sender_id == 0:
 		sender_id = multiplayer.get_unique_id()
-	if holder_peer_id != sender_id:
+	if not holder_paths.has(sender_id):
 		return
 
-	# Apply the holder's final local release state before returning authority to server.
+	holder_paths.erase(sender_id)
+	if not holder_paths.is_empty():
+		_refresh_primary_holder_cache()
+		sync_holders.rpc(holder_paths.duplicate(true))
+		_update_hold_authority()
+		return
+
+	# Apply the holder's final local release state once nobody is carrying anymore.
 	global_transform = release_transform
 	linear_velocity = release_linear_velocity
 	angular_velocity = release_angular_velocity
 	_target_transform = release_transform
 	_target_linear_velocity = release_linear_velocity
 	_target_angular_velocity = release_angular_velocity
-	set_holder.rpc(NodePath(""), 0)
-	# Return cargo simulation authority to server once released.
-	call_deferred("_deferred_return_authority_to_server")
+	_refresh_primary_holder_cache()
+	sync_holders.rpc(holder_paths.duplicate(true))
+	_update_hold_authority()
 
 @rpc("any_peer", "reliable")
 func request_throw(release_transform: Transform3D, release_linear_velocity: Vector3, release_angular_velocity: Vector3, throw_velocity: Vector3) -> void:
@@ -203,7 +225,7 @@ func request_throw(release_transform: Transform3D, release_linear_velocity: Vect
 	var sender_id: int = multiplayer.get_remote_sender_id()
 	if sender_id == 0:
 		sender_id = multiplayer.get_unique_id()
-	if holder_peer_id != sender_id:
+	if not holder_paths.has(sender_id):
 		return
 
 	global_transform = release_transform
@@ -216,17 +238,16 @@ func request_throw(release_transform: Transform3D, release_linear_velocity: Vect
 	_target_transform = global_transform
 	_target_linear_velocity = linear_velocity
 	_target_angular_velocity = angular_velocity
-	set_holder.rpc(NodePath(""), 0)
-	call_deferred("_deferred_return_authority_to_server")
-
-func _deferred_return_authority_to_server() -> void:
-	set_sim_authority.rpc(1)
+	holder_paths.clear()
+	_refresh_primary_holder_cache()
+	sync_holders.rpc(holder_paths.duplicate(true))
+	_update_hold_authority()
 
 func _update_player_impact_ragdoll(delta: float) -> void:
 	_impact_cooldown = max(0.0, _impact_cooldown - delta)
 	if _impact_cooldown > 0.0:
 		return
-	if holder_peer_id != 0:
+	if not holder_paths.is_empty():
 		return
 	if linear_velocity.length() < player_impact_ragdoll_speed:
 		return
@@ -246,12 +267,40 @@ func _update_player_impact_ragdoll(delta: float) -> void:
 		_impact_cooldown = 0.35
 		return
 
+@rpc("any_peer", "unreliable")
+func request_player_push(push_impulse: Vector3, contact_point: Vector3) -> void:
+	if not multiplayer.is_server():
+		return
+	if not holder_paths.is_empty():
+		return
+	var sender_id: int = multiplayer.get_remote_sender_id()
+	if sender_id == 0:
+		sender_id = multiplayer.get_unique_id()
+	var sender_node: PlayerController = get_tree().current_scene.get_node_or_null("Players/%d" % sender_id) as PlayerController
+	if sender_node == null:
+		return
+	if sender_node.global_position.distance_to(global_position) > 3.2:
+		return
+	var impulse: Vector3 = push_impulse
+	impulse.y = 0.0
+	impulse *= player_push_impulse_scale
+	impulse = impulse.limit_length(max_player_push_impulse)
+	if impulse.length() <= 0.01:
+		return
+	apply_impulse(impulse, contact_point - global_position)
+
 @rpc("any_peer", "reliable", "call_local")
-func set_holder(target_holder_path: NodePath, target_peer_id: int) -> void:
+func sync_holders(next_holder_paths: Dictionary) -> void:
 	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
 		return
-	holder_path = target_holder_path
-	holder_peer_id = target_peer_id
+	var was_held: bool = not holder_paths.is_empty()
+	holder_paths = next_holder_paths.duplicate(true)
+	_refresh_primary_holder_cache()
+	if was_held and holder_paths.is_empty():
+		_snap_to_next_sync = true
+		_target_transform = global_transform
+		_target_linear_velocity = linear_velocity
+		_target_angular_velocity = angular_velocity
 	_apply_hold_collision_state()
 
 @rpc("any_peer", "reliable", "call_local")
@@ -266,8 +315,8 @@ func set_sim_authority(target_peer_id: int) -> void:
 func respawn_cargo_from_server() -> void:
 	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
 		return
-	holder_path = NodePath("")
-	holder_peer_id = 0
+	holder_paths.clear()
+	_refresh_primary_holder_cache()
 	_apply_hold_collision_state()
 	set_sim_authority(1)
 	_clear_ship_latch()
@@ -280,6 +329,11 @@ func respawn_cargo_from_server() -> void:
 func sync_state(next_transform: Transform3D, next_linear_velocity: Vector3, next_angular_velocity: Vector3, next_on_ship: bool, next_ship_relative_transform: Transform3D) -> void:
 	if is_multiplayer_authority():
 		return
+	if _snap_to_next_sync:
+		_snap_to_next_sync = false
+		global_transform = next_transform
+		linear_velocity = next_linear_velocity
+		angular_velocity = next_angular_velocity
 	_target_transform = next_transform
 	_target_linear_velocity = next_linear_velocity
 	_target_angular_velocity = next_angular_velocity
@@ -287,7 +341,7 @@ func sync_state(next_transform: Transform3D, next_linear_velocity: Vector3, next
 	_target_ship_relative_transform = next_ship_relative_transform
 
 func _apply_hold_collision_state() -> void:
-	var is_held: bool = not holder_path.is_empty() and holder_peer_id != 0
+	var is_held: bool = not holder_paths.is_empty()
 	if is_held:
 		# Keep held cargo physically collidable so players can bump each other with it.
 		collision_layer = _default_collision_layer
@@ -295,6 +349,48 @@ func _apply_hold_collision_state() -> void:
 		return
 	collision_layer = _default_collision_layer
 	collision_mask = _default_collision_mask
+
+func _refresh_primary_holder_cache() -> void:
+	holder_peer_id = 0
+	holder_path = NodePath("")
+	if holder_paths.is_empty():
+		return
+	var keys: Array = holder_paths.keys()
+	if keys.is_empty():
+		return
+	holder_peer_id = int(keys[0])
+	holder_path = holder_paths.get(holder_peer_id, NodePath(""))
+
+func _update_hold_authority() -> void:
+	if holder_paths.size() == 1:
+		var keys: Array = holder_paths.keys()
+		if not keys.is_empty():
+			set_sim_authority.rpc(int(keys[0]))
+			return
+	set_sim_authority.rpc(1)
+
+func _get_holder_nodes() -> Array[Node3D]:
+	var holders: Array[Node3D] = []
+	for peer_key: Variant in holder_paths.keys():
+		var path: NodePath = holder_paths.get(peer_key, NodePath(""))
+		if path.is_empty() or not has_node(path):
+			continue
+		var holder: Node3D = get_node(path) as Node3D
+		if holder != null:
+			holders.append(holder)
+	return holders
+
+func _prune_invalid_holders() -> bool:
+	var changed: bool = false
+	var stale_keys: Array = []
+	for peer_key: Variant in holder_paths.keys():
+		var path: NodePath = holder_paths.get(peer_key, NodePath(""))
+		if path.is_empty() or not has_node(path):
+			stale_keys.append(peer_key)
+	for stale_key: Variant in stale_keys:
+		holder_paths.erase(stale_key)
+		changed = true
+	return changed
 
 func _move_held_towards(target_position: Vector3, delta: float) -> void:
 	var alpha: float = min(1.0, delta * follow_lerp_speed)
@@ -381,7 +477,7 @@ func _is_held_position_blocked(candidate_position: Vector3) -> bool:
 		if collider is PlayerController:
 			return true
 		if collider is CargoCrate:
-			continue
+			return true
 		if collider is ShipWheel:
 			continue
 		if collider is SkyShip:
