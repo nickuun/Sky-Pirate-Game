@@ -17,6 +17,7 @@
 [ext_resource type="PackedScene" uid="uid://b3aqu6ux07ud3" path="res://assets/blockbench-whale-free/source/model.gltf" id="15_hiqwa"]
 [ext_resource type="Script" uid="uid://blfxs2scrg62e" path="res://src/world/sky_whale.gd" id="16_1qwhl"]
 [ext_resource type="Script" uid="uid://c8mo72kepdiwx" path="res://src/world/cloud_field.gd" id="17_c2l0d"]
+[ext_resource type="PackedScene" uid="uid://c6x3d4ed4be5d" path="res://src/ship/rowboat.tscn" id="18_ikiii"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_f3sb7"]
 size = Vector3(1, 0.2, 1)
@@ -199,3 +200,6 @@ orbit_radius = 72.0
 orbit_speed_degrees = 6.5
 bob_height = 2.8
 bob_speed = 0.55
+
+[node name="SkyShip2" parent="." unique_id=2054720719 instance=ExtResource("18_ikiii")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.7740602, 31.979332, -7.028125)

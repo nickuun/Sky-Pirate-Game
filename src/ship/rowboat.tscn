@@ -1,0 +1,84 @@
+[gd_scene format=3 uid="uid://c6x3d4ed4be5d"]
+
+[ext_resource type="Script" uid="uid://cgeb3khhgnbvq" path="res://src/ship/ship.gd" id="1_f5jp8"]
+[ext_resource type="Script" uid="uid://bmdn2bxat7jae" path="res://src/ship/deck_area.gd" id="2_u8gpi"]
+[ext_resource type="Script" uid="uid://b0xhxtsbak1dh" path="res://src/ship/wheel.gd" id="3_1l0br"]
+[ext_resource type="PackedScene" uid="uid://derww3x2xhop" path="res://assets/FreeSample/Rowboat.fbx" id="4_f5jp8"]
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_ship"]
+friction = 1.25
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ship_hull"]
+size = Vector3(7.31985, 2.2746093, 3.6428223)
+
+[sub_resource type="BoxMesh" id="BoxMesh_ship_hull"]
+size = Vector3(6, 0.8, 3)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ship_hull"]
+albedo_color = Color(0.803922, 0.521569, 0.282353, 1)
+roughness = 0.72
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_deck_area"]
+size = Vector3(6.6, 1.35, 3.7)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_wheel"]
+size = Vector3(0.8, 1, 0.8)
+
+[sub_resource type="CylinderMesh" id="CylinderMesh_wheel"]
+top_radius = 0.3
+bottom_radius = 0.3
+height = 0.18
+
+[node name="Rowboat" type="RigidBody3D" unique_id=2054720719]
+collision_layer = 8
+collision_mask = 3
+axis_lock_angular_x = true
+axis_lock_angular_z = true
+mass = 95.0
+physics_material_override = SubResource("PhysicsMaterial_ship")
+gravity_scale = 0.15
+continuous_cd = true
+linear_damp = 0.9
+angular_damp = 1.4
+script = ExtResource("1_f5jp8")
+
+[node name="HullCollision" type="CollisionShape3D" parent="." unique_id=534116060]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0, 0.301, 0)
+shape = SubResource("BoxShape3D_ship_hull")
+debug_color = Color(0.99607843, 0, 0.22352941, 1)
+
+[node name="HullMesh" type="MeshInstance3D" parent="." unique_id=1210813078]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.009786308, 0.07515097, 0.011364281)
+visible = false
+mesh = SubResource("BoxMesh_ship_hull")
+surface_material_override/0 = SubResource("StandardMaterial3D_ship_hull")
+
+[node name="DeckArea" type="Area3D" parent="." unique_id=586974134]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.0017194748, 0.98, 0.03248179)
+visible = false
+collision_layer = 16
+collision_mask = 0
+monitoring = false
+script = ExtResource("2_u8gpi")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="DeckArea" unique_id=2018829772]
+shape = SubResource("BoxShape3D_deck_area")
+
+[node name="Wheel" type="Area3D" parent="." unique_id=1870123428]
+transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, -0.019891083, 2.2639282, 0.7853775)
+visible = false
+script = ExtResource("3_1l0br")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wheel" unique_id=1948018495]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0, 0, 0)
+shape = SubResource("BoxShape3D_wheel")
+
+[node name="WheelVisual" type="MeshInstance3D" parent="Wheel" unique_id=1901430353]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, 0, 0.61771464, 0)
+mesh = SubResource("CylinderMesh_wheel")
+
+[node name="DriverAnchor" type="Marker3D" parent="Wheel" unique_id=1250115051]
+transform = Transform3D(-4.371139e-08, 0, -1, 0, 1, 0, 1, 0, -4.371139e-08, -0.47698277, 0.532887, -0.19385713)
+
+[node name="Rowboat" parent="." unique_id=1360371698 instance=ExtResource("4_f5jp8")]
+transform = Transform3D(-2, 0, -3.019916e-07, 0, 2, 0, 3.019916e-07, 0, -2, 0, -0.836, 0)
