@@ -10,9 +10,8 @@
 [ext_resource type="PackedScene" uid="uid://c2kcr08rr2fx0" path="res://assets/FreeSample/PalmTree.fbx" id="8_ic0uy"]
 [ext_resource type="PackedScene" uid="uid://cdg7v5adypim" path="res://assets/FreeSample/Rock_4.fbx" id="9_k3n1d"]
 [ext_resource type="PackedScene" uid="uid://buskgqny0vtno" path="res://assets/FreeSample/Lantern_1.fbx" id="10_2o6r5"]
-[ext_resource type="PackedScene" uid="uid://q1vuq176jph5" path="res://assets/FreeSample/Bridge_2.fbx" id="11_70uel"]
-[ext_resource type="PackedScene" uid="uid://derww3x2xhop" path="res://assets/FreeSample/Rowboat.fbx" id="11_k3n1d"]
 [ext_resource type="PackedScene" uid="uid://3lfwcjk5jbam" path="res://assets/FreeSample/Paddle.fbx" id="12_2o6r5"]
+[ext_resource type="PackedScene" uid="uid://bq27gr2ytesu2" path="res://src/environment/bridges/bridge.tscn" id="12_cbp6q"]
 [ext_resource type="PackedScene" uid="uid://bqs27crk7xxa2" path="res://assets/FreeSample/Building_1.fbx" id="13_70uel"]
 [ext_resource type="PackedScene" uid="uid://4at8t0o06cae" path="res://assets/voxel_treasure_asset_pack/scene.gltf" id="14_70uel"]
 [ext_resource type="PackedScene" uid="uid://b3aqu6ux07ud3" path="res://assets/blockbench-whale-free/source/model.gltf" id="15_hiqwa"]
@@ -110,7 +109,7 @@ mesh = SubResource("BoxMesh_gv5m4")
 surface_material_override/0 = SubResource("StandardMaterial3D_ground")
 
 [node name="SkyShip" parent="." unique_id=553199057 instance=ExtResource("5_pk5m8")]
-transform = Transform3D(0.9992438, 9.313226e-10, 0.0388812, 0.0081044305, 0.978035, -0.20828328, -0.038027175, 0.20844088, 0.9772954, -7.1682577, 34.75384, 3.001381)
+transform = Transform3D(0.9992438, 9.313226e-10, 0.0388812, 0.0081044305, 0.978035, -0.20828328, -0.038027175, 0.20844088, 0.9772954, -5.1452336, 34.75384, 3.001381)
 
 [node name="CargoCrate" parent="." unique_id=1588129755 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0292387, 33.306114, -5.178396)
@@ -171,22 +170,22 @@ environment = SubResource("Environment_f3sb7")
 transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 5.870514, 30.865417, 4.3530097)
 
 [node name="PalmTree2" parent="." unique_id=1209077348 instance=ExtResource("8_ic0uy")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -3.0677776, 30.865417, 0.28846645)
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 5.2489243, 30.865417, -3.1848688)
 
 [node name="Rock_4" parent="." unique_id=581141064 instance=ExtResource("9_k3n1d")]
 transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -5.2795057, 30.865417, -5.2530947)
 
 [node name="Lantern_1" parent="." unique_id=1838022343 instance=ExtResource("10_2o6r5")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -3.6321998, 30.865417, 1.1676416)
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 4.1935515, 30.865417, 1.1676416)
 
-[node name="Bridge_2" parent="." unique_id=1214739531 instance=ExtResource("11_70uel")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -1.749784, 30.865417, 2.984303)
+[node name="Bridge" parent="." unique_id=1398272412 instance=ExtResource("12_cbp6q")]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 1.7849329, 29.424536, 2.984303)
 
-[node name="Rowboat" parent="." unique_id=1360371698 instance=ExtResource("11_k3n1d")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 7.0851574, 30.865417, 4.3680515)
+[node name="Bridge2" parent="." unique_id=107673714 instance=ExtResource("12_cbp6q")]
+transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -0.8764689, 30.474102, 2.984303)
 
 [node name="Paddle" parent="." unique_id=966389705 instance=ExtResource("12_2o6r5")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.731335, 30.865414, 2.6517696)
+transform = Transform3D(0.5277714, 0, -0.84938645, 0, 1, 0, 0.84938645, 0, 0.5277714, -3.195373, 30.865414, 5.4105167)
 
 [node name="Building_1" parent="." unique_id=1904144884 instance=ExtResource("13_70uel")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 55.99709, 2.1584969, -61.681496)

@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://bq27gr2ytesu2"]
+
+[ext_resource type="PackedScene" uid="uid://q1vuq176jph5" path="res://assets/FreeSample/Bridge_2.fbx" id="1_bysfk"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_0bi4v"]
+size = Vector3(1, 0.07169922, 2.864)
+
+[sub_resource type="CylinderShape3D" id="CylinderShape3D_vs5lf"]
+height = 1.4025879
+radius = 0.09
+
+[node name="Bridge" type="Node3D" unique_id=1398272412]
+
+[node name="Bridge_2" parent="." unique_id=1214739531 instance=ExtResource("1_bysfk")]
+
+[node name="StaticBody3D" type="StaticBody3D" parent="." unique_id=717034605]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="StaticBody3D" unique_id=640714030]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.0383596, 0.0050908327)
+shape = SubResource("BoxShape3D_0bi4v")
+
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="StaticBody3D" unique_id=1109066244]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5517571, 0.6968994, 0)
+shape = SubResource("CylinderShape3D_vs5lf")
+
+[node name="CollisionShape3D3" type="CollisionShape3D" parent="StaticBody3D" unique_id=1566889778]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5517571, 0.6968994, -1.4502039)
+shape = SubResource("CylinderShape3D_vs5lf")
+
+[node name="CollisionShape3D4" type="CollisionShape3D" parent="StaticBody3D" unique_id=106434293]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.5517571, 0.697, 1.45)
+shape = SubResource("CylinderShape3D_vs5lf")
+
+[node name="CollisionShape3D5" type="CollisionShape3D" parent="StaticBody3D" unique_id=974770123]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.555, 0.6968994, 0)
+shape = SubResource("CylinderShape3D_vs5lf")
+
+[node name="CollisionShape3D6" type="CollisionShape3D" parent="StaticBody3D" unique_id=1484816693]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.555, 0.6968994, -1.4502039)
+shape = SubResource("CylinderShape3D_vs5lf")
+
+[node name="CollisionShape3D7" type="CollisionShape3D" parent="StaticBody3D" unique_id=1097628881]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.555, 0.697, 1.45)
+shape = SubResource("CylinderShape3D_vs5lf")
