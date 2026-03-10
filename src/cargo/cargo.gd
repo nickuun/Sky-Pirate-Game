@@ -9,7 +9,7 @@ class_name CargoCrate
 @export var sync_position_deadzone: float = 0.03
 @export var ship_deck_area_mask: int = 16
 @export var ship_carry_lerp_speed: float = 18.0
-@export var ship_latching_enabled: bool = true
+@export var ship_latching_enabled: bool = false
 @export var ship_latch_duration: float = 0.16
 @export var ship_latch_capture_speed: float = 0.9
 @export var max_carry_speed: float = 8.5
@@ -48,6 +48,7 @@ func _ready() -> void:
 	_default_collision_mask = collision_mask
 	_target_transform = global_transform
 	_spawn_transform = global_transform
+	add_to_group("cargo")
 	add_to_group("cargo_crate")
 	contact_monitor = true
 	max_contacts_reported = 8
