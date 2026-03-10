@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://b3m4xnbip004u"]
+
+[ext_resource type="PackedScene" uid="uid://dlco2qgc28kud" path="res://assets/FreeSample/Boat.fbx" id="1_evqc2"]
+[ext_resource type="Script" uid="uid://e5h5ex38q3wv" path="res://src/cargo/PhysicsShipSandbox/sandbox/ship_controller.gd" id="2_iqf2l"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_hull"]
+size = Vector3(3.2312012, 2.953186, 7.449341)
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_deck_area"]
+size = Vector3(2.8, 1.2, 6.9)
+
+[node name="Ship" type="RigidBody3D" unique_id=1741193511]
+mass = 95.0
+center_of_mass_mode = 1
+center_of_mass = Vector3(0, -1.6, 0)
+continuous_cd = true
+contact_monitor = true
+max_contacts_reported = 24
+collision_layer = 1
+collision_mask = 9
+script = ExtResource("2_iqf2l")
+
+[node name="Boat" parent="." unique_id=1024579830 instance=ExtResource("1_evqc2")]
+transform = Transform3D(-1, 0, -8.742278e-08, 0, 1, 0, 8.742278e-08, 0, -1, 0, -0.015035629, -0.8425747)
+
+[node name="HullCollision" type="CollisionShape3D" parent="." unique_id=1863921504]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.006713867, 1.4704645, 0.037502408)
+shape = SubResource("BoxShape3D_hull")
+
+[node name="Deck" type="Node3D" parent="." unique_id=1949561435]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.6349643, 0.09056637)
+
+[node name="DeckArea" type="Area3D" parent="Deck" unique_id=1979682202]
+monitorable = false
+
+[node name="DeckAreaShape" type="CollisionShape3D" parent="Deck/DeckArea" unique_id=741126052]
+shape = SubResource("BoxShape3D_deck_area")
+
+[node name="NoseMarker" type="Marker3D" parent="." unique_id=618457254]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.8849643, -3.1594338)
+
+[node name="CargoSpawnMarker" type="Marker3D" parent="." unique_id=72281652]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 2.3349643, 0.04056637)
+

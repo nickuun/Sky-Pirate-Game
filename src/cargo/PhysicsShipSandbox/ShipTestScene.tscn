@@ -1,0 +1,68 @@
+[gd_scene load_steps=10 format=3 uid="uid://dfdjvfbqbnq6w"]
+
+[ext_resource type="PackedScene" uid="uid://b3m4xnbip004u" path="res://src/cargo/PhysicsShipSandbox/ships/default_ship/default_ship.tscn" id="1_fj7yv"]
+[ext_resource type="Script" path="res://src/cargo/PhysicsShipSandbox/sandbox/sandbox_world.gd" id="2_bf731"]
+[ext_resource type="Script" path="res://src/cargo/PhysicsShipSandbox/sandbox/follow_camera.gd" id="3_4bh2u"]
+[ext_resource type="Script" path="res://src/cargo/PhysicsShipSandbox/sandbox/cloud_field.gd" id="4_5kptv"]
+
+[sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_wf6on"]
+sky_top_color = Color(0.121569, 0.45098, 0.972549, 1)
+sky_horizon_color = Color(0.470588, 0.917647, 1, 1)
+ground_bottom_color = Color(0.121569, 0.572549, 0.403922, 1)
+
+[sub_resource type="Sky" id="Sky_6rqm7"]
+sky_material = SubResource("ProceduralSkyMaterial_wf6on")
+
+[sub_resource type="Environment" id="Environment_lae5a"]
+background_mode = 2
+sky = SubResource("Sky_6rqm7")
+ambient_light_source = 3
+ambient_light_sky_contribution = 0.85
+ambient_light_energy = 1.15
+tonemap_exposure = 1.15
+
+[sub_resource type="PlaneMesh" id="PlaneMesh_4s5sx"]
+size = Vector2(6000, 6000)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_vibrant_ground"]
+albedo_color = Color(0.505882, 0.839216, 0.396078, 1)
+roughness = 0.95
+
+[node name="World" type="Node3D" unique_id=1963766093]
+script = ExtResource("2_bf731")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="."]
+environment = SubResource("Environment_lae5a")
+
+[node name="Sun" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.939693, -0.34202, 0, 0.296198, 0.813798, -0.5, 0.17101, 0.469846, 0.866025, 0, 12, 0)
+light_energy = 1.45
+shadow_enabled = true
+shadow_opacity = 0.75
+
+[node name="SkyFillLight" type="DirectionalLight3D" parent="."]
+transform = Transform3D(0.92388, -0.34202, -0.17101, 0.382683, 0.813798, 0.437309, -7.45058e-09, -0.469846, 0.882748, 0, 16, 0)
+light_color = Color(0.905882, 0.968627, 1, 1)
+light_energy = 0.45
+shadow_enabled = false
+
+[node name="Ship" parent="." unique_id=1741193511 instance=ExtResource("1_fj7yv")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 12, 0)
+
+[node name="CloudField" type="Node3D" parent="."]
+script = ExtResource("4_5kptv")
+
+[node name="FarGround" type="MeshInstance3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -140, 0)
+mesh = SubResource("PlaneMesh_4s5sx")
+material_override = SubResource("StandardMaterial3D_vibrant_ground")
+
+[node name="CargoContainer" type="Node3D" parent="."]
+
+[node name="FollowCameraRig" type="Node3D" parent="."]
+script = ExtResource("3_4bh2u")
+
+[node name="Camera3D" type="Camera3D" parent="FollowCameraRig"]
+current = true
+fov = 70.0
+
