@@ -163,22 +163,22 @@ script = ExtResource("7_fpsui")
 environment = SubResource("Environment_f3sb7")
 
 [node name="PalmTree" parent="." unique_id=247073230 instance=ExtResource("8_ic0uy")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 5.870514, 30.865417, 4.3530097)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.870514, 30.865417, 4.3530097)
 
 [node name="PalmTree2" parent="." unique_id=1209077348 instance=ExtResource("8_ic0uy")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 5.2489243, 30.865417, -3.1848688)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.2489243, 30.865417, -3.1848688)
 
 [node name="Rock_4" parent="." unique_id=581141064 instance=ExtResource("9_k3n1d")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -5.2795057, 30.865417, -5.2530947)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.2795057, 30.865417, -5.2530947)
 
 [node name="Lantern_1" parent="." unique_id=1838022343 instance=ExtResource("10_2o6r5")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 4.1935515, 30.865417, 1.1676416)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1935515, 30.865417, 1.1676416)
 
 [node name="Bridge" parent="." unique_id=1398272412 instance=ExtResource("12_cbp6q")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, 1.7849329, 29.424536, 2.984303)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7849329, 30.655943, 2.984303)
 
 [node name="Bridge2" parent="." unique_id=107673714 instance=ExtResource("12_cbp6q")]
-transform = Transform3D(2, 0, 0, 0, 2, 0, 0, 0, 2, -0.8764689, 30.474102, 2.984303)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8764689, 30.474102, 2.984303)
 
 [node name="Paddle" parent="." unique_id=966389705 instance=ExtResource("12_2o6r5")]
 transform = Transform3D(0.5277714, 0, -0.84938645, 0, 1, 0, 0.84938645, 0, 0.5277714, -3.195373, 30.865414, 5.4105167)

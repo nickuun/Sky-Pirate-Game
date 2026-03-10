@@ -3,10 +3,10 @@
 [ext_resource type="Script" path="res://src/cargo/cargo.gd" id="1_e4mxr"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_tu681"]
-size = Vector3(0.8, 0.8, 0.8)
+size = Vector3(0.4, 0.4, 0.4)
 
 [sub_resource type="BoxMesh" id="BoxMesh_nq4lk"]
-size = Vector3(0.8, 0.8, 0.8)
+size = Vector3(0.4, 0.4, 0.4)
 
 [sub_resource type="PhysicsMaterial" id="PhysicsMaterial_4vdq2"]
 friction = 1.0
@@ -15,7 +15,7 @@ bounce = 0.0
 [node name="CargoCrate" type="RigidBody3D"]
 collision_layer = 2
 collision_mask = 11
-mass = 7.5
+mass = 3.75
 linear_damp = 1.0
 angular_damp = 2.4
 physics_material_override = SubResource("PhysicsMaterial_4vdq2")

@@ -72,7 +72,7 @@ script = ExtResource("4_q2mfr")
 shape = SubResource("BoxShape3D_deck_area")
 
 [node name="Wheel" type="Area3D" parent="." unique_id=1870123428]
-transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, -0.019891083, 1.7879095, 2.435743)
+transform = Transform3D(-4.3711385e-08, 0, -0.99999994, 0, 1, 0, 0.99999994, 0, -4.3711385e-08, -0.019891083, 1.6431513, 2.435743)
 visible = false
 script = ExtResource("2_hfi5q")
 

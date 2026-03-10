@@ -4,6 +4,8 @@
 [ext_resource type="PackedScene" uid="uid://lk8chwjae7g6" path="res://assets/pirate-hat-minecraft-item/source/model.gltf" id="2_rxibo"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_rxibo"]
+radius = 0.25
+height = 1.0
 
 [sub_resource type="CapsuleMesh" id="CapsuleMesh_mf2ua"]
 
@@ -17,20 +19,21 @@ shape = SubResource("CapsuleShape3D_rxibo")
 [node name="Visual" type="Node3D" parent="." unique_id=2093754896]
 
 [node name="blockbench_export" parent="Visual" unique_id=1723005991 instance=ExtResource("2_rxibo")]
-transform = Transform3D(-0.0018432182, 0.08586904, 0.9963047, 0.00015886215, 0.9963064, -0.08586889, -0.99999833, 0, -0.0018500516, -0.52195734, 0.8641354, 0.43967313)
+transform = Transform3D(-0.0009216091, 0.04293452, 0.49815235, 7.9431075e-05, 0.4981532, -0.042934444, -0.49999917, 0, -0.0009250258, -0.26097867, 0.4320677, 0.21983656)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Visual" unique_id=1919315678]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 mesh = SubResource("CapsuleMesh_mf2ua")
 
 [node name="CameraPivot" type="Node3D" parent="." unique_id=1014377324]
-transform = Transform3D(1, 0, 0, 0, 0.9659258, 0.25881904, 0, -0.25881904, 0.9659258, 0.9, 1.05, 0.0)
+transform = Transform3D(1, 0, 0, 0, 0.9659258, 0.25881904, 0, -0.25881904, 0.9659258, 0.45, 0.525, 0.0)
 
 [node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot" unique_id=1020361452]
 spring_length = 2.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot/SpringArm3D" unique_id=180385261]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.68, -0.06, -0.08)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.34, -0.03, -0.04)
 fov = 60.0
 
 [node name="HoldPoint" type="Marker3D" parent="CameraPivot" unique_id=2130609945]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.27, -0.18, -1.02)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.135, -0.09, -0.51)
