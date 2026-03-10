@@ -16,8 +16,8 @@ class_name CargoCrate
 @export var ship_surface_grip: float = 3.5
 @export var ship_anchor_strength: float = 0.15
 @export var ship_anchor_deadzone: float = 0.18
-@export var player_impact_ragdoll_speed: float = 4.8
-@export var player_impact_impulse_scale: float = 0.48
+@export var player_impact_ragdoll_speed: float = 7.2
+@export var player_impact_impulse_scale: float = 0.34
 @export var player_push_impulse_scale: float = 0.95
 @export var max_player_push_impulse: float = 5.5
 

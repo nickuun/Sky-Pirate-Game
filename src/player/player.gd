@@ -32,8 +32,8 @@ class_name PlayerController
 @export var waddle_bob_amount: float = 0.06
 @export var waddle_bob_speed: float = 10.0
 @export var mouse_sensitivity: float = 0.0025
-@export var min_pitch_degrees: float = -62.0
-@export var max_pitch_degrees: float = 35.0
+@export var min_pitch_degrees: float = -85.0
+@export var max_pitch_degrees: float = 80.0
 @export var pickup_range: float = 7.0
 @export var cargo_control_range: float = 2.0
 @export var floor_max_angle_degrees: float = 42.0
@@ -131,6 +131,7 @@ func _physics_process(delta: float) -> void:
 		_drive_collision_grace_remaining = drive_collision_grace_duration
 	_was_driving = driving_now
 	_drive_collision_grace_remaining = max(0.0, _drive_collision_grace_remaining - delta)
+	_update_drive_collision_state(driving_now)
 	_update_hold_point_kinematics(delta)
 	_read_input()
 	_update_throw_charge(delta)
@@ -158,8 +159,8 @@ func _physics_process(delta: float) -> void:
 		_apply_cargo_push_contacts()
 		_refresh_ship_hull_contact()
 		_update_ship_latch_state(0.0)
+		_restore_upright_body(delta)
 		_restore_body_collision_transform(delta)
-	_update_drive_collision_state(driving_now)
 
 	var support_ship: SkyShip = _get_sync_support_ship()
 	var on_ship: bool = support_ship != null
@@ -545,6 +546,8 @@ func _lock_to_wheel(delta: float) -> void:
 	var anchor: Marker3D = _driving_wheel.get_driver_anchor()
 	if anchor == null:
 		return
+	var target_basis: Basis = Basis.from_euler(Vector3(0.0, _yaw, 0.0))
+	global_basis = global_basis.orthonormalized().slerp(target_basis, min(1.0, delta * wheel_lock_lerp_speed))
 	if _wheel_lock_blend_time_remaining > 0.0:
 		var alpha: float = min(1.0, delta * wheel_lock_lerp_speed)
 		global_position = global_position.lerp(anchor.global_position, alpha)
@@ -698,6 +701,14 @@ func _restore_body_collision_transform(delta: float) -> void:
 		return
 	body_collision.transform = body_collision.transform.interpolate_with(_default_body_collision_transform, min(1.0, delta * 14.0))
 
+func _restore_upright_body(delta: float) -> void:
+	if _latched_ship != null and is_instance_valid(_latched_ship):
+		return
+	if _is_ship_hull_climbing():
+		return
+	var target_basis: Basis = Basis.from_euler(Vector3(0.0, _yaw, 0.0))
+	basis = basis.orthonormalized().slerp(target_basis, min(1.0, delta * 10.0))
+
 func _update_drive_collision_state(driving_now: bool) -> void:
 	var should_disable: bool = driving_now or _drive_collision_grace_remaining > 0.0
 	if should_disable == _drive_collision_disabled:
@@ -744,7 +755,10 @@ func _apply_latched_ship_follow(delta: float) -> void:
 	var current_ship_transform: Transform3D = _latched_ship.global_transform
 	var ship_delta: Transform3D = current_ship_transform * _latched_ship_transform.affine_inverse()
 	global_position = ship_delta * global_position
-	basis = (ship_delta.basis * basis).orthonormalized()
+	var previous_yaw: float = _latched_ship_transform.basis.get_euler().y
+	var current_yaw: float = current_ship_transform.basis.get_euler().y
+	var yaw_delta: float = wrapf(current_yaw - previous_yaw, -PI, PI)
+	basis = (Basis.from_euler(Vector3(0.0, yaw_delta, 0.0)) * basis).orthonormalized()
 
 	_latched_ship_transform = current_ship_transform
 
@@ -762,6 +776,9 @@ func _update_ship_latch_state(delta: float) -> void:
 	var ship: SkyShip = _probe_ship_below()
 	if ship == null:
 		if _latched_ship == null:
+			return
+		if is_on_floor():
+			_clear_ship_latch()
 			return
 		_ship_latch_time_remaining = max(0.0, _ship_latch_time_remaining - delta)
 		if _ship_latch_time_remaining <= 0.0:

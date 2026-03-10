@@ -17,7 +17,6 @@
 [ext_resource type="PackedScene" uid="uid://b3aqu6ux07ud3" path="res://assets/blockbench-whale-free/source/model.gltf" id="15_hiqwa"]
 [ext_resource type="Script" uid="uid://blfxs2scrg62e" path="res://src/world/sky_whale.gd" id="16_1qwhl"]
 [ext_resource type="Script" uid="uid://c8mo72kepdiwx" path="res://src/world/cloud_field.gd" id="17_c2l0d"]
-[ext_resource type="PackedScene" uid="uid://c6x3d4ed4be5d" path="res://src/ship/rowboat.tscn" id="18_ikiii"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_f3sb7"]
 size = Vector3(1, 0.2, 1)
@@ -105,7 +104,10 @@ mesh = SubResource("BoxMesh_gv5m4")
 surface_material_override/0 = SubResource("StandardMaterial3D_ground")
 
 [node name="SkyShip" parent="." unique_id=553199057 instance=ExtResource("5_pk5m8")]
-transform = Transform3D(0.9992438, 9.313226e-10, 0.0388812, 0.0081044305, 0.978035, -0.20828328, -0.038027175, 0.20844088, 0.9772954, -5.1452336, 34.75384, 3.001381)
+transform = Transform3D(-0.9967302, -0.0077097546, 0.08043206, -0.0025111286, 0.99791217, 0.0645357, -0.08076166, 0.06412275, -0.99466866, -2.6151295, 30.490217, 10.7547455)
+
+[node name="SkyShip2" parent="." unique_id=2054720719 instance=ExtResource("5_pk5m8")]
+transform = Transform3D(-0.99999243, -0.0026988983, 0.002822563, -0.002511129, 0.99791217, 0.0645357, -0.002990827, 0.06452817, -0.9979115, 5.7900057, 30.490217, 10.7547455)
 
 [node name="CargoCrate" parent="." unique_id=1588129755 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0292387, 33.306114, -5.178396)
@@ -130,6 +132,18 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.297634, 9.640003, -62.6302
 
 [node name="CargoCrate4" parent="." unique_id=2092341606 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.8787642, 36.937057, -5.178396)
+
+[node name="CargoCrate10" parent="." unique_id=1627913974 instance=ExtResource("3_y3hkc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2183726, 34.762157, 11.843616)
+
+[node name="CargoCrate11" parent="." unique_id=1960825041 instance=ExtResource("3_y3hkc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2183726, 34.762157, 10.705931)
+
+[node name="CargoCrate12" parent="." unique_id=67571828 instance=ExtResource("3_y3hkc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2183726, 36.8791, 10.705931)
+
+[node name="CargoCrate13" parent="." unique_id=1986232992 instance=ExtResource("3_y3hkc")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2183726, 36.305763, 11.5281725)
 
 [node name="Players" type="Node3D" parent="." unique_id=1165330599]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 31.190624, 0)
@@ -175,10 +189,19 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.2795057, 30.865417, -5.253
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1935515, 30.865417, 1.1676416)
 
 [node name="Bridge" parent="." unique_id=1398272412 instance=ExtResource("12_cbp6q")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.7849329, 30.655943, 2.984303)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.785, 30.656, 3)
 
-[node name="Bridge2" parent="." unique_id=107673714 instance=ExtResource("12_cbp6q")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.8764689, 30.474102, 2.984303)
+[node name="Bridge2" parent="." unique_id=2022626750 instance=ExtResource("12_cbp6q")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.785, 30.656, 5.9)
+
+[node name="Bridge3" parent="." unique_id=599059701 instance=ExtResource("12_cbp6q")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.785, 30.656, 8.8)
+
+[node name="Bridge4" parent="." unique_id=1154561869 instance=ExtResource("12_cbp6q")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.785, 30.656, 11.7)
+
+[node name="Bridge5" parent="." unique_id=961992815 instance=ExtResource("12_cbp6q")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.785, 30.656, 11.7)
 
 [node name="Paddle" parent="." unique_id=966389705 instance=ExtResource("12_2o6r5")]
 transform = Transform3D(0.5277714, 0, -0.84938645, 0, 1, 0, 0.84938645, 0, 0.5277714, -3.195373, 30.865414, 5.4105167)
@@ -200,6 +223,3 @@ orbit_radius = 72.0
 orbit_speed_degrees = 6.5
 bob_height = 2.8
 bob_speed = 0.55
-
-[node name="SkyShip2" parent="." unique_id=2054720719 instance=ExtResource("18_ikiii")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5.7740602, 31.979332, -7.028125)
