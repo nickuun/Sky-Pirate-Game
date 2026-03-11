@@ -30,4 +30,4 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.34, -0.03, -0.04)
 fov = 60.0
 
 [node name="HoldPoint" type="Marker3D" parent="CameraPivot" unique_id=2130609945]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.135, -0.09, -0.51)
+transform = Transform3D(1, 0, 0, 0, 1.0000002, 0, 0, 0, 1.0000002, 0.00027441978, -0.0634239, -0.6091833)

@@ -17,8 +17,6 @@
 [ext_resource type="PackedScene" uid="uid://b3aqu6ux07ud3" path="res://assets/blockbench-whale-free/source/model.gltf" id="15_hiqwa"]
 [ext_resource type="Script" uid="uid://blfxs2scrg62e" path="res://src/world/sky_whale.gd" id="16_1qwhl"]
 [ext_resource type="Script" uid="uid://c8mo72kepdiwx" path="res://src/world/cloud_field.gd" id="17_c2l0d"]
-[ext_resource type="PackedScene" uid="uid://bfxbc4wwdhdrq" path="res://assets/ASSET PACK 2 by Avabea (v 1.0.0)/small_human.gltf" id="18_ikiii"]
-[ext_resource type="Script" uid="uid://bm0ynm7enhslk" path="res://src/test_scenes/small_human.gd" id="19_cbp6q"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_f3sb7"]
 size = Vector3(1, 0.2, 1)
@@ -225,7 +223,3 @@ orbit_radius = 72.0
 orbit_speed_degrees = 6.5
 bob_height = 2.8
 bob_speed = 0.55
-
-[node name="blockbench_export" parent="." unique_id=149795522 instance=ExtResource("18_ikiii")]
-transform = Transform3D(0.65, 0, 0, 0, 0.65, 0, 0, 0, 0.65, 0.09434891, 30.886803, -3.8558638)
-script = ExtResource("19_cbp6q")

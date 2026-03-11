@@ -5,8 +5,7 @@ const ANIM_IDLE: StringName = &"standing"
 const ANIM_RUN: StringName = &"run"
 const ANIM_CARRY_IDLE: StringName = &"carry"
 const ANIM_CARRY_RUN: StringName = &"run_with_arms"
-const ANIM_DEATH: StringName = &"death"
-const ANIM_DEATH_POSE_TIME: float = 0.05
+const ANIM_RAGDOLL: StringName = &"disagree"
 
 @export var move_speed: float = 6.0
 @export var acceleration: float = 18.0
@@ -595,9 +594,9 @@ func _configure_avatar_animations() -> void:
 		if anim != null:
 			anim.loop_mode = Animation.LOOP_LINEAR
 
-	var death_anim: Animation = avatar_animation_player.get_animation(ANIM_DEATH)
-	if death_anim != null:
-		death_anim.loop_mode = Animation.LOOP_NONE
+	var ragdoll_anim: Animation = avatar_animation_player.get_animation(ANIM_RAGDOLL)
+	if ragdoll_anim != null:
+		ragdoll_anim.loop_mode = Animation.LOOP_LINEAR
 
 func _update_avatar_animation() -> void:
 	if avatar_animation_player == null:
@@ -606,7 +605,7 @@ func _update_avatar_animation() -> void:
 	if _is_ragdolled:
 		if not _avatar_death_played:
 			_avatar_death_played = true
-			_pose_avatar_at_death_frame()
+			_play_avatar_animation(ANIM_RAGDOLL, true)
 		return
 
 	_avatar_death_played = false
@@ -629,15 +628,6 @@ func _play_avatar_animation(anim_name: StringName, restart: bool = false) -> voi
 	avatar_animation_player.play(anim_name, 0.15)
 	_current_avatar_animation = anim_name
 
-func _pose_avatar_at_death_frame() -> void:
-	if avatar_animation_player == null:
-		return
-	if not avatar_animation_player.has_animation(ANIM_DEATH):
-		return
-	avatar_animation_player.play(ANIM_DEATH)
-	avatar_animation_player.seek(ANIM_DEATH_POSE_TIME, true)
-	avatar_animation_player.pause()
-	_current_avatar_animation = ANIM_DEATH
 
 func _has_visible_held_cargo() -> bool:
 	if _held_cargo != null and is_instance_valid(_held_cargo):
