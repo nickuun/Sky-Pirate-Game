@@ -1,6 +1,7 @@
 extends RigidBody3D
 class_name CargoCrate
 
+@export var cargo_type_id: StringName = &"cube_small"
 @export var follow_lerp_speed: float = 18.0
 @export var sync_lerp_speed: float = 22.0
 @export var control_request_range: float = 6.0
@@ -21,6 +22,13 @@ class_name CargoCrate
 @export var player_push_impulse_scale: float = 0.95
 @export var max_player_push_impulse: float = 5.5
 
+const CARGO_CONFIG_PATH: String = "res://config/cargo/cargo_properties.txt"
+const _DEFAULT_CARGO_ID: StringName = &"cube_small"
+const _DEFAULT_COLOR: Color = Color(0.847, 0.612, 0.275, 1.0)
+
+static var _cargo_catalog_loaded: bool = false
+static var _cargo_catalog: Dictionary = {}
+
 var holder_path: NodePath = NodePath("")
 var holder_peer_id: int = 0
 var holder_paths: Dictionary = {}
@@ -28,6 +36,7 @@ var sim_peer_id: int = 1
 var _default_collision_layer: int = 0
 var _default_collision_mask: int = 0
 @onready var _collision_shape: CollisionShape3D = $CollisionShape3D
+@onready var _mesh_instance: MeshInstance3D = $MeshInstance3D
 
 var _target_transform: Transform3D
 var _target_linear_velocity: Vector3 = Vector3.ZERO
@@ -44,6 +53,7 @@ var _impact_cooldown: float = 0.0
 var _snap_to_next_sync: bool = false
 
 func _ready() -> void:
+	_apply_cargo_definition()
 	_default_collision_layer = collision_layer
 	_default_collision_mask = collision_mask
 	_target_transform = global_transform
@@ -54,6 +64,171 @@ func _ready() -> void:
 	max_contacts_reported = 8
 	set_sim_authority(1)
 	_apply_hold_collision_state()
+
+func apply_cargo_type(next_cargo_type_id: StringName) -> void:
+	cargo_type_id = next_cargo_type_id
+	_apply_cargo_definition()
+
+func get_cargo_type_id() -> StringName:
+	return cargo_type_id
+
+func _apply_cargo_definition() -> void:
+	var definition: Dictionary = _get_cargo_definition(cargo_type_id)
+	var shape_kind: String = String(definition.get("shape", "box"))
+	var size: Vector3 = definition.get("size", Vector3(0.4, 0.4, 0.4))
+	var next_mass: float = float(definition.get("mass", 3.75))
+	var friction: float = float(definition.get("friction", 1.0))
+	var bounce: float = float(definition.get("bounce", 0.0))
+	var color: Color = definition.get("color", _DEFAULT_COLOR)
+
+	mass = next_mass
+
+	if _collision_shape != null:
+		_collision_shape.shape = _build_collision_shape(shape_kind, size)
+	if _mesh_instance != null:
+		_mesh_instance.mesh = _build_mesh(shape_kind, size)
+		var material := StandardMaterial3D.new()
+		material.albedo_color = color
+		material.roughness = 0.7
+		_mesh_instance.material_override = material
+
+	var physics_material := PhysicsMaterial.new()
+	physics_material.friction = friction
+	physics_material.bounce = bounce
+	physics_material_override = physics_material
+
+func _build_collision_shape(shape_kind: String, size: Vector3) -> Shape3D:
+	match shape_kind:
+		"box":
+			var box := BoxShape3D.new()
+			box.size = size
+			return box
+		"cylinder":
+			var cylinder := CylinderShape3D.new()
+			cylinder.radius = max(0.01, (size.x + size.z) * 0.25)
+			cylinder.height = size.y
+			return cylinder
+		"sphere":
+			var sphere := SphereShape3D.new()
+			sphere.radius = max(0.01, max(size.x, max(size.y, size.z)) * 0.5)
+			return sphere
+		"pyramid":
+			var convex := ConvexPolygonShape3D.new()
+			convex.points = PackedVector3Array(_get_pyramid_points(size))
+			return convex
+		_:
+			var fallback := BoxShape3D.new()
+			fallback.size = size
+			return fallback
+
+func _build_mesh(shape_kind: String, size: Vector3) -> Mesh:
+	match shape_kind:
+		"box":
+			var box := BoxMesh.new()
+			box.size = size
+			return box
+		"cylinder":
+			var cylinder := CylinderMesh.new()
+			cylinder.top_radius = max(0.01, (size.x + size.z) * 0.25)
+			cylinder.bottom_radius = cylinder.top_radius
+			cylinder.height = size.y
+			return cylinder
+		"sphere":
+			var sphere := SphereMesh.new()
+			sphere.radius = max(0.01, max(size.x, max(size.y, size.z)) * 0.5)
+			sphere.height = sphere.radius * 2.0
+			return sphere
+		"pyramid":
+			return _build_pyramid_mesh(size)
+		_:
+			var fallback := BoxMesh.new()
+			fallback.size = size
+			return fallback
+
+func _build_pyramid_mesh(size: Vector3) -> ArrayMesh:
+	var points: Array[Vector3] = _get_pyramid_points(size)
+	var st := SurfaceTool.new()
+	st.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_add_triangle(st, points[0], points[1], points[2])
+	_add_triangle(st, points[0], points[2], points[3])
+	_add_triangle(st, points[0], points[4], points[1])
+	_add_triangle(st, points[1], points[4], points[2])
+	_add_triangle(st, points[2], points[4], points[3])
+	_add_triangle(st, points[3], points[4], points[0])
+	st.generate_normals()
+	return st.commit()
+
+func _add_triangle(st: SurfaceTool, a: Vector3, b: Vector3, c: Vector3) -> void:
+	st.add_vertex(a)
+	st.add_vertex(b)
+	st.add_vertex(c)
+
+func _get_pyramid_points(size: Vector3) -> Array[Vector3]:
+	var half := size * 0.5
+	return [
+		Vector3(-half.x, -half.y, -half.z),
+		Vector3(half.x, -half.y, -half.z),
+		Vector3(half.x, -half.y, half.z),
+		Vector3(-half.x, -half.y, half.z),
+		Vector3(0.0, half.y, 0.0),
+	]
+
+func _get_cargo_definition(requested_id: StringName) -> Dictionary:
+	_ensure_cargo_catalog_loaded()
+	var resolved_id: StringName = requested_id
+	if not _cargo_catalog.has(resolved_id):
+		resolved_id = _DEFAULT_CARGO_ID
+	cargo_type_id = resolved_id
+	return _cargo_catalog.get(resolved_id, {
+		"shape": "box",
+		"size": Vector3(0.4, 0.4, 0.4),
+		"mass": 3.75,
+		"friction": 1.0,
+		"bounce": 0.0,
+		"color": _DEFAULT_COLOR,
+	})
+
+func _ensure_cargo_catalog_loaded() -> void:
+	if _cargo_catalog_loaded:
+		return
+	_cargo_catalog_loaded = true
+	_cargo_catalog.clear()
+
+	var file: FileAccess = FileAccess.open(CARGO_CONFIG_PATH, FileAccess.READ)
+	if file == null:
+		push_warning("Cargo config missing: %s" % CARGO_CONFIG_PATH)
+		return
+
+	var line_index: int = 0
+	while not file.eof_reached():
+		var raw_line: String = file.get_line()
+		line_index += 1
+		var line: String = raw_line.strip_edges()
+		if line.is_empty() or line.begins_with("#"):
+			continue
+		var parts: PackedStringArray = line.split(",", false)
+		if parts.size() < 9:
+			push_warning("Skipping cargo config line %d: expected 9 csv fields" % line_index)
+			continue
+		var id: StringName = StringName(parts[0].strip_edges())
+		_cargo_catalog[id] = {
+			"shape": parts[1].strip_edges().to_lower(),
+			"size": Vector3(
+				_parse_float(parts[2], 0.4),
+				_parse_float(parts[3], 0.4),
+				_parse_float(parts[4], 0.4)
+			),
+			"mass": _parse_float(parts[5], 3.75),
+			"friction": _parse_float(parts[6], 1.0),
+			"bounce": _parse_float(parts[7], 0.0),
+			"color": Color.from_string(parts[8].strip_edges(), _DEFAULT_COLOR),
+		}
+
+func _parse_float(raw_value: String, fallback: float) -> float:
+	var trimmed: String = raw_value.strip_edges()
+	if trimmed.is_valid_float():
+		return trimmed.to_float()
+	return fallback
 
 func is_held_by(peer_id: int) -> bool:
 	return holder_paths.has(peer_id)

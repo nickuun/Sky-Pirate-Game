@@ -1,0 +1,6 @@
+# id,shape,size_x,size_y,size_z,mass,friction,bounce,color
+cube_small,box,0.4,0.4,0.4,3.75,1.0,0.0,#d89c46
+cylinder_small,cylinder,0.4,0.4,0.4,4.1,1.0,0.0,#c96f3c
+sphere_small,sphere,0.4,0.4,0.4,3.2,0.9,0.0,#e0d47f
+pyramid_small,pyramid,0.4,0.4,0.4,3.9,1.0,0.0,#8fc86a
+cube_large,box,0.8,0.8,0.8,8.25,1.0,0.0,#7aa2dd
