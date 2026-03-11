@@ -1,6 +1,13 @@
 extends CharacterBody3D
 class_name PlayerController
 
+const ANIM_IDLE: StringName = &"standing"
+const ANIM_RUN: StringName = &"run"
+const ANIM_CARRY_IDLE: StringName = &"carry"
+const ANIM_CARRY_RUN: StringName = &"run_with_arms"
+const ANIM_DEATH: StringName = &"death"
+const ANIM_DEATH_POSE_TIME: float = 0.05
+
 @export var move_speed: float = 6.0
 @export var acceleration: float = 18.0
 @export var deceleration: float = 22.0
@@ -56,6 +63,8 @@ class_name PlayerController
 @onready var camera_pivot: Node3D = $CameraPivot
 @onready var camera: Camera3D = $CameraPivot/SpringArm3D/Camera3D
 @onready var hold_point: Marker3D = $CameraPivot/HoldPoint
+@onready var avatar: Node3D = $Visual/Avatar
+@onready var avatar_animation_player: AnimationPlayer = $Visual/Avatar/AnimationPlayer
 
 var _move_input: Vector2 = Vector2.ZERO
 var _waddle_time: float = 0.0
@@ -94,6 +103,8 @@ var _hold_point_prev_global: Vector3 = Vector3.ZERO
 var _hold_point_velocity: Vector3 = Vector3.ZERO
 var _hold_point_tracking_ready: bool = false
 var _default_body_collision_transform: Transform3D = Transform3D.IDENTITY
+var _current_avatar_animation: StringName = &""
+var _avatar_death_played: bool = false
 
 func _ready() -> void:
 	add_to_group("player_controller")
@@ -116,12 +127,15 @@ func _ready() -> void:
 	Network.server_started.connect(_on_session_started)
 	Network.connected_to_server.connect(_on_session_started)
 	Network.disconnected.connect(_on_session_ended)
+	_configure_avatar_animations()
 	_update_camera_state()
 	_on_session_started()
+	_update_avatar_animation()
 
 func _physics_process(delta: float) -> void:
 	if not is_multiplayer_authority():
 		_apply_remote_state(delta)
+		_update_avatar_animation()
 		return
 
 	_update_driving_wheel_reference()
@@ -139,7 +153,8 @@ func _physics_process(delta: float) -> void:
 	if _is_ragdolled:
 		_apply_ragdoll_sim(delta)
 		_update_drive_collision_state(false)
-		sync_state.rpc(global_position, basis, velocity, visual.position, visual.basis, false, Vector3.ZERO, Basis.IDENTITY)
+		_update_avatar_animation()
+		sync_state.rpc(global_position, basis, velocity, visual.position, visual.basis, false, Vector3.ZERO, Basis.IDENTITY, true)
 		return
 	_update_ship_latch_state(delta)
 	_apply_latched_ship_follow(delta)
@@ -162,6 +177,8 @@ func _physics_process(delta: float) -> void:
 		_restore_upright_body(delta)
 		_restore_body_collision_transform(delta)
 
+	_update_avatar_animation()
+
 	var support_ship: SkyShip = _get_sync_support_ship()
 	var on_ship: bool = support_ship != null
 	var rel_position: Vector3 = Vector3.ZERO
@@ -169,7 +186,7 @@ func _physics_process(delta: float) -> void:
 	if on_ship:
 		rel_position = support_ship.to_local(global_position)
 		rel_basis = (support_ship.global_basis.inverse() * basis).orthonormalized()
-	sync_state.rpc(global_position, basis, velocity, visual.position, visual.basis, on_ship, rel_position, rel_basis)
+	sync_state.rpc(global_position, basis, velocity, visual.position, visual.basis, on_ship, rel_position, rel_basis, false)
 
 func _notification(what: int) -> void:
 	if what == NOTIFICATION_PATH_RENAMED:
@@ -405,7 +422,7 @@ func request_ragdoll_from_hit(impulse: Vector3) -> void:
 	force_ragdoll_from_server.rpc(impulse)
 
 @rpc("any_peer", "unreliable", "call_remote")
-func sync_state(pos: Vector3, body_basis: Basis, body_velocity: Vector3, visual_pos: Vector3, visual_basis: Basis, on_ship: bool, ship_rel_pos: Vector3, ship_rel_basis: Basis) -> void:
+func sync_state(pos: Vector3, body_basis: Basis, body_velocity: Vector3, visual_pos: Vector3, visual_basis: Basis, on_ship: bool, ship_rel_pos: Vector3, ship_rel_basis: Basis, ragdolled: bool) -> void:
 	if is_multiplayer_authority():
 		return
 
@@ -417,6 +434,13 @@ func sync_state(pos: Vector3, body_basis: Basis, body_velocity: Vector3, visual_
 	_remote_target_on_ship = on_ship
 	_remote_target_ship_rel_position = ship_rel_pos
 	_remote_target_ship_rel_basis = ship_rel_basis
+	if ragdolled:
+		if not _is_ragdolled:
+			_is_ragdolled = true
+			_avatar_death_played = false
+	else:
+		if _is_ragdolled:
+			_exit_ragdoll()
 
 func _update_camera_state() -> void:
 	if camera == null:
@@ -561,6 +585,70 @@ func _get_effective_move_speed() -> float:
 
 func _get_effective_jump_velocity() -> float:
 	return jump_velocity
+
+func _configure_avatar_animations() -> void:
+	if avatar_animation_player == null:
+		return
+
+	for anim_name: StringName in [ANIM_IDLE, ANIM_RUN, ANIM_CARRY_IDLE, ANIM_CARRY_RUN]:
+		var anim: Animation = avatar_animation_player.get_animation(anim_name)
+		if anim != null:
+			anim.loop_mode = Animation.LOOP_LINEAR
+
+	var death_anim: Animation = avatar_animation_player.get_animation(ANIM_DEATH)
+	if death_anim != null:
+		death_anim.loop_mode = Animation.LOOP_NONE
+
+func _update_avatar_animation() -> void:
+	if avatar_animation_player == null:
+		return
+
+	if _is_ragdolled:
+		if not _avatar_death_played:
+			_avatar_death_played = true
+			_pose_avatar_at_death_frame()
+		return
+
+	_avatar_death_played = false
+	var moving: bool = Vector2(velocity.x, velocity.z).length() > 0.15
+	var carrying: bool = _has_visible_held_cargo()
+	var target_animation: StringName = ANIM_IDLE
+	if carrying:
+		target_animation = ANIM_CARRY_RUN if moving else ANIM_CARRY_IDLE
+	elif moving:
+		target_animation = ANIM_RUN
+	_play_avatar_animation(target_animation)
+
+func _play_avatar_animation(anim_name: StringName, restart: bool = false) -> void:
+	if avatar_animation_player == null:
+		return
+	if not restart and _current_avatar_animation == anim_name and avatar_animation_player.is_playing():
+		return
+	if not avatar_animation_player.has_animation(anim_name):
+		return
+	avatar_animation_player.play(anim_name, 0.15)
+	_current_avatar_animation = anim_name
+
+func _pose_avatar_at_death_frame() -> void:
+	if avatar_animation_player == null:
+		return
+	if not avatar_animation_player.has_animation(ANIM_DEATH):
+		return
+	avatar_animation_player.play(ANIM_DEATH)
+	avatar_animation_player.seek(ANIM_DEATH_POSE_TIME, true)
+	avatar_animation_player.pause()
+	_current_avatar_animation = ANIM_DEATH
+
+func _has_visible_held_cargo() -> bool:
+	if _held_cargo != null and is_instance_valid(_held_cargo):
+		return _held_cargo.is_held_by(get_multiplayer_authority())
+
+	var cargo_nodes: Array[Node] = get_tree().get_nodes_in_group("cargo")
+	for node: Node in cargo_nodes:
+		var cargo: CargoCrate = node as CargoCrate
+		if cargo != null and cargo.is_held_by(get_multiplayer_authority()):
+			return true
+	return false
 
 func _compose_cargo_release_velocity() -> Vector3:
 	var swing_velocity: Vector3 = _hold_point_velocity * hold_swing_velocity_gain

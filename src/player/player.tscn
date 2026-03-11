@@ -1,13 +1,11 @@
 [gd_scene format=3 uid="uid://dpma26wj8r6te"]
 
 [ext_resource type="Script" uid="uid://b60c02go5xl8s" path="res://src/player/player.gd" id="1_4anbu"]
-[ext_resource type="PackedScene" uid="uid://lk8chwjae7g6" path="res://assets/pirate-hat-minecraft-item/source/model.gltf" id="2_rxibo"]
+[ext_resource type="PackedScene" uid="uid://bfxbc4wwdhdrq" path="res://assets/ASSET PACK 2 by Avabea (v 1.0.0)/small_human.gltf" id="2_human"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_rxibo"]
 radius = 0.25
 height = 1.0
-
-[sub_resource type="CapsuleMesh" id="CapsuleMesh_mf2ua"]
 
 [node name="Player" type="CharacterBody3D" unique_id=45355869]
 collision_mask = 11
@@ -18,15 +16,11 @@ shape = SubResource("CapsuleShape3D_rxibo")
 
 [node name="Visual" type="Node3D" parent="." unique_id=2093754896]
 
-[node name="blockbench_export" parent="Visual" unique_id=1723005991 instance=ExtResource("2_rxibo")]
-transform = Transform3D(-0.0009216091, 0.04293452, 0.49815235, 7.9431075e-05, 0.4981532, -0.042934444, -0.49999917, 0, -0.0009250258, -0.26097867, 0.4320677, 0.21983656)
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Visual" unique_id=1919315678]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
-mesh = SubResource("CapsuleMesh_mf2ua")
+[node name="Avatar" parent="Visual" unique_id=1330293661 instance=ExtResource("2_human")]
+transform = Transform3D(0.65, 0, 0, 0, 0.65, 0, 0, 0, 0.65, 0, -0.47256142, 0)
 
 [node name="CameraPivot" type="Node3D" parent="." unique_id=1014377324]
-transform = Transform3D(1, 0, 0, 0, 0.9659258, 0.25881904, 0, -0.25881904, 0.9659258, 0.45, 0.525, 0.0)
+transform = Transform3D(1, 0, 0, 0, 0.9659258, 0.25881904, 0, -0.25881904, 0.9659258, 0.45, 0.525, 0)
 
 [node name="SpringArm3D" type="SpringArm3D" parent="CameraPivot" unique_id=1020361452]
 spring_length = 2.0
