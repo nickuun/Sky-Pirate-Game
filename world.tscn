@@ -17,6 +17,7 @@
 [ext_resource type="PackedScene" uid="uid://b3aqu6ux07ud3" path="res://assets/blockbench-whale-free/source/model.gltf" id="15_hiqwa"]
 [ext_resource type="Script" uid="uid://blfxs2scrg62e" path="res://src/world/sky_whale.gd" id="16_1qwhl"]
 [ext_resource type="Script" uid="uid://c8mo72kepdiwx" path="res://src/world/cloud_field.gd" id="17_c2l0d"]
+[ext_resource type="PackedScene" uid="uid://hierrh1bbcg5" path="res://src/world/sell_zone.tscn" id="18_sellz"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_f3sb7"]
 size = Vector3(1, 0.2, 1)
@@ -187,6 +188,9 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.2795057, 30.865417, -5.253
 
 [node name="Lantern_1" parent="." unique_id=1838022343 instance=ExtResource("10_2o6r5")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 4.1935515, 30.865417, 1.1676416)
+
+[node name="SellZone" parent="." unique_id=919704480 instance=ExtResource("18_sellz")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.093, 31.190025, -2.7758536)
 
 [node name="Bridge" parent="." unique_id=1398272412 instance=ExtResource("12_cbp6q")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 1.785, 30.656, 3)

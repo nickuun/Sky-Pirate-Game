@@ -1,7 +1,7 @@
 [gd_scene format=3 uid="uid://b3m4xnbip004u"]
 
-[ext_resource type="PackedScene" uid="uid://dlco2qgc28kud" path="res://assets/FreeSample/Boat.fbx" id="1_evqc2"]
-[ext_resource type="Script" uid="uid://e5h5ex38q3wv" path="res://src/cargo/PhysicsShipSandbox/sandbox/ship_controller.gd" id="2_iqf2l"]
+[ext_resource type="PackedScene" uid="uid://c4dwmkcx0m8ub" path="res://assets/FreeSample/Boat.fbx" id="1_evqc2"]
+[ext_resource type="Script" uid="uid://d1ag5vj2t1bwu" path="res://src/cargo/PhysicsShipSandbox/sandbox/ship_controller.gd" id="2_iqf2l"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_hull"]
 size = Vector3(3.2312012, 2.953186, 7.449341)

@@ -6,12 +6,15 @@ class_name WorldScene
 
 @onready var players_root: Node3D = $Players
 @onready var spawner: MultiplayerSpawner = $Spawner
+@onready var ui_root: CanvasLayer = $UI
 
 var _physics_debug_enabled: bool = false
 var _physics_debug_timer: float = 0.0
 const _PHYSICS_DEBUG_INTERVAL: float = 0.25
 var _physics_debug_toggle_latch: bool = false
 var _physics_debug_label: Label = null
+var _sold_count_label: Label = null
+var _sold_cargo_count: int = 0
 
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player_data
@@ -26,6 +29,8 @@ func _ready() -> void:
 	# In case the world starts after a multiplayer session already exists.
 	_on_session_started()
 	_setup_physics_debug_label()
+	_setup_sell_count_label()
+	_update_sell_count_label()
 
 func _process(delta: float) -> void:
 	var toggle_pressed: bool = Input.is_key_pressed(KEY_F6)
@@ -48,6 +53,7 @@ func _process(delta: float) -> void:
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
 		_spawn_player(id)
+		sync_sold_cargo_count.rpc_id(id, _sold_cargo_count)
 
 func _on_peer_disconnected(id: int) -> void:
 	# Clean up player node named with their peer id.
@@ -71,10 +77,14 @@ func _on_session_started() -> void:
 func _on_session_disconnected() -> void:
 	for child: Node in players_root.get_children():
 		child.queue_free()
+	_sold_cargo_count = 0
+	_update_sell_count_label()
 
 func restart_world() -> void:
 	if not multiplayer.is_server():
 		return
+
+	sync_sold_cargo_count.rpc(0)
 
 	for n: Node in get_tree().get_nodes_in_group("sky_ship"):
 		var ship: SkyShip = n as SkyShip
@@ -90,6 +100,27 @@ func restart_world() -> void:
 		var c: CargoCrate = n as CargoCrate
 		if c != null:
 			c.respawn_cargo_from_server.rpc()
+
+func sell_cargo(cargo: CargoCrate) -> void:
+	if not multiplayer.is_server():
+		return
+	if cargo == null or not is_instance_valid(cargo):
+		return
+	if cargo.is_queued_for_deletion():
+		return
+	if not cargo.holder_paths.is_empty():
+		return
+
+	_sold_cargo_count += 1
+	sync_sold_cargo_count.rpc(_sold_cargo_count)
+	cargo.consume_from_server.rpc()
+
+@rpc("any_peer", "reliable", "call_local")
+func sync_sold_cargo_count(next_count: int) -> void:
+	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
+		return
+	_sold_cargo_count = max(0, next_count)
+	_update_sell_count_label()
 
 func spawn_cargo_at_host_spawn() -> void:
 	if not multiplayer.is_server():
@@ -191,3 +222,22 @@ func _setup_physics_debug_label() -> void:
 	label.visible = false
 	canvas.add_child(label)
 	_physics_debug_label = label
+
+func _setup_sell_count_label() -> void:
+	if ui_root == null:
+		return
+
+	var label := Label.new()
+	label.name = "SellCount"
+	label.position = Vector2(14.0, 42.0)
+	label.size = Vector2(280.0, 30.0)
+	label.add_theme_font_size_override("font_size", 18)
+	label.modulate = Color(1.0, 0.95, 0.7, 0.98)
+	label.text = ""
+	ui_root.add_child(label)
+	_sold_count_label = label
+
+func _update_sell_count_label() -> void:
+	if _sold_count_label == null:
+		return
+	_sold_count_label.text = "Sold: %d" % _sold_cargo_count

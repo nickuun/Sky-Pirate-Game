@@ -501,6 +501,12 @@ func respawn_cargo_from_server() -> void:
 	angular_velocity = Vector3.ZERO
 	freeze = false
 
+@rpc("any_peer", "reliable", "call_local")
+func consume_from_server() -> void:
+	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
+		return
+	queue_free()
+
 @rpc("authority", "unreliable", "call_remote")
 func sync_state(next_transform: Transform3D, next_linear_velocity: Vector3, next_angular_velocity: Vector3, next_on_ship: bool, next_ship_relative_transform: Transform3D) -> void:
 	if is_multiplayer_authority():
