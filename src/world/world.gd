@@ -8,13 +8,17 @@ class_name WorldScene
 @onready var spawner: MultiplayerSpawner = $Spawner
 @onready var ui_root: CanvasLayer = $UI
 
+const _REMOTE_RESPAWN_MIN_DISTANCE: float = 24.0
+
 var _physics_debug_enabled: bool = false
 var _physics_debug_timer: float = 0.0
 const _PHYSICS_DEBUG_INTERVAL: float = 0.25
 var _physics_debug_toggle_latch: bool = false
 var _physics_debug_label: Label = null
 var _sold_count_label: Label = null
-var _sold_cargo_count: int = 0
+var _sold_cargo_value_total: int = 0
+var _cargo_respawn_templates: Array[Dictionary] = []
+var _cargo_spawn_serial: int = 0
 
 func _ready() -> void:
 	spawner.spawn_function = _spawn_player_data
@@ -31,6 +35,7 @@ func _ready() -> void:
 	_setup_physics_debug_label()
 	_setup_sell_count_label()
 	_update_sell_count_label()
+	_cache_remote_cargo_respawn_templates()
 
 func _process(delta: float) -> void:
 	var toggle_pressed: bool = Input.is_key_pressed(KEY_F6)
@@ -53,7 +58,7 @@ func _process(delta: float) -> void:
 func _on_peer_connected(id: int) -> void:
 	if multiplayer.is_server():
 		_spawn_player(id)
-		sync_sold_cargo_count.rpc_id(id, _sold_cargo_count)
+		sync_sold_cargo_total.rpc_id(id, _sold_cargo_value_total)
 
 func _on_peer_disconnected(id: int) -> void:
 	# Clean up player node named with their peer id.
@@ -77,14 +82,14 @@ func _on_session_started() -> void:
 func _on_session_disconnected() -> void:
 	for child: Node in players_root.get_children():
 		child.queue_free()
-	_sold_cargo_count = 0
+	_sold_cargo_value_total = 0
 	_update_sell_count_label()
 
 func restart_world() -> void:
 	if not multiplayer.is_server():
 		return
 
-	sync_sold_cargo_count.rpc(0)
+	sync_sold_cargo_total.rpc(0)
 
 	for n: Node in get_tree().get_nodes_in_group("sky_ship"):
 		var ship: SkyShip = n as SkyShip
@@ -111,15 +116,18 @@ func sell_cargo(cargo: CargoCrate) -> void:
 	if not cargo.holder_paths.is_empty():
 		return
 
-	_sold_cargo_count += 1
-	sync_sold_cargo_count.rpc(_sold_cargo_count)
+	var sold_value: int = max(1, cargo.get_sell_value())
+	var cargo_type_id: StringName = cargo.get_cargo_type_id()
+	_sold_cargo_value_total += sold_value
+	sync_sold_cargo_total.rpc(_sold_cargo_value_total)
 	cargo.consume_from_server.rpc()
+	_respawn_sold_cargo(cargo_type_id)
 
 @rpc("any_peer", "reliable", "call_local")
-func sync_sold_cargo_count(next_count: int) -> void:
+func sync_sold_cargo_total(next_total: int) -> void:
 	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
 		return
-	_sold_cargo_count = max(0, next_count)
+	_sold_cargo_value_total = max(0, next_total)
 	_update_sell_count_label()
 
 func spawn_cargo_at_host_spawn() -> void:
@@ -128,10 +136,17 @@ func spawn_cargo_at_host_spawn() -> void:
 	var host_id: int = 1
 	var spawn_position: Vector3 = _get_player_spawn_global(host_id) + Vector3(0.0, 1.0, 0.0)
 	var spawn_transform := Transform3D(Basis.IDENTITY, spawn_position)
-	spawn_cargo_for_all.rpc(spawn_transform)
+	_spawn_cargo_typed_for_all(spawn_transform, &"cube_small")
 
 @rpc("any_peer", "reliable", "call_local")
 func spawn_cargo_for_all(spawn_transform: Transform3D) -> void:
+	_spawn_cargo_instance(spawn_transform, &"cube_small", "")
+
+@rpc("any_peer", "reliable", "call_local")
+func spawn_cargo_typed_for_all(spawn_transform: Transform3D, cargo_type_id: StringName, cargo_name: String) -> void:
+	_spawn_cargo_instance(spawn_transform, cargo_type_id, cargo_name)
+
+func _spawn_cargo_instance(spawn_transform: Transform3D, cargo_type_id: StringName, cargo_name: String) -> void:
 	if not multiplayer.is_server() and multiplayer.get_remote_sender_id() != 1:
 		return
 	if cargo_scene == null:
@@ -139,9 +154,45 @@ func spawn_cargo_for_all(spawn_transform: Transform3D) -> void:
 	var cargo: CargoCrate = cargo_scene.instantiate() as CargoCrate
 	if cargo == null:
 		return
+	if not cargo_name.is_empty():
+		cargo.name = cargo_name
 	cargo.global_transform = spawn_transform
-	add_child(cargo)
+	cargo.cargo_type_id = cargo_type_id
+	add_child(cargo, true)
 	cargo.owner = get_tree().current_scene
+
+func _cache_remote_cargo_respawn_templates() -> void:
+	_cargo_respawn_templates.clear()
+
+	var sell_zone: Node3D = get_node_or_null("SellZone") as Node3D
+	var sell_origin: Vector3 = sell_zone.global_position if sell_zone != null else Vector3.ZERO
+	for node: Node in get_tree().get_nodes_in_group("cargo_crate"):
+		var cargo: CargoCrate = node as CargoCrate
+		if cargo == null:
+			continue
+		if cargo.global_position.distance_to(sell_origin) < _REMOTE_RESPAWN_MIN_DISTANCE:
+			continue
+		_cargo_respawn_templates.append({
+			"transform": cargo.global_transform,
+			"cargo_type_id": cargo.get_cargo_type_id(),
+		})
+
+func _respawn_sold_cargo(cargo_type_id: StringName) -> void:
+	if cargo_scene == null:
+		return
+	if _cargo_respawn_templates.is_empty():
+		return
+
+	var template: Dictionary = _cargo_respawn_templates[randi() % _cargo_respawn_templates.size()]
+	var spawn_transform: Transform3D = template.get("transform", Transform3D.IDENTITY)
+	_spawn_cargo_typed_for_all(spawn_transform, cargo_type_id)
+
+func _spawn_cargo_typed_for_all(spawn_transform: Transform3D, cargo_type_id: StringName) -> void:
+	if not multiplayer.is_server():
+		return
+	_cargo_spawn_serial += 1
+	var cargo_name: String = "DynamicCargo_%d" % _cargo_spawn_serial
+	spawn_cargo_typed_for_all.rpc(spawn_transform, cargo_type_id, cargo_name)
 
 func _spawn_player_data(data: Variant) -> Node:
 	var id: int = int(data)
@@ -240,4 +291,4 @@ func _setup_sell_count_label() -> void:
 func _update_sell_count_label() -> void:
 	if _sold_count_label == null:
 		return
-	_sold_count_label.text = "Sold: %d" % _sold_cargo_count
+	_sold_count_label.text = "Gold: %d" % _sold_cargo_value_total

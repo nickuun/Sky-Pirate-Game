@@ -3,6 +3,7 @@ class_name CargoCrate
 
 @export var cargo_type_id: StringName = &"cube_small"
 @export var follow_lerp_speed: float = 18.0
+@export var follow_catchup_distance_gain: float = 26.0
 @export var sync_lerp_speed: float = 22.0
 @export var control_request_range: float = 6.0
 @export var max_linear_speed: float = 16.0
@@ -51,6 +52,7 @@ var _ship_latch_time_remaining: float = 0.0
 var _spawn_transform: Transform3D = Transform3D.IDENTITY
 var _impact_cooldown: float = 0.0
 var _snap_to_next_sync: bool = false
+var _holder_collision_exceptions: Array[PhysicsBody3D] = []
 
 func _ready() -> void:
 	_apply_cargo_definition()
@@ -71,6 +73,10 @@ func apply_cargo_type(next_cargo_type_id: StringName) -> void:
 
 func get_cargo_type_id() -> StringName:
 	return cargo_type_id
+
+func get_sell_value() -> int:
+	var definition: Dictionary = _get_cargo_definition(cargo_type_id)
+	return int(definition.get("sell_value", 1))
 
 func _apply_cargo_definition() -> void:
 	var definition: Dictionary = _get_cargo_definition(cargo_type_id)
@@ -208,7 +214,7 @@ func _ensure_cargo_catalog_loaded() -> void:
 			continue
 		var parts: PackedStringArray = line.split(",", false)
 		if parts.size() < 9:
-			push_warning("Skipping cargo config line %d: expected 9 csv fields" % line_index)
+			push_warning("Skipping cargo config line %d: expected at least 9 csv fields" % line_index)
 			continue
 		var id: StringName = StringName(parts[0].strip_edges())
 		_cargo_catalog[id] = {
@@ -222,12 +228,19 @@ func _ensure_cargo_catalog_loaded() -> void:
 			"friction": _parse_float(parts[6], 1.0),
 			"bounce": _parse_float(parts[7], 0.0),
 			"color": Color.from_string(parts[8].strip_edges(), _DEFAULT_COLOR),
+			"sell_value": _parse_int(parts[9], 1) if parts.size() >= 10 else 1,
 		}
 
 func _parse_float(raw_value: String, fallback: float) -> float:
 	var trimmed: String = raw_value.strip_edges()
 	if trimmed.is_valid_float():
 		return trimmed.to_float()
+	return fallback
+
+func _parse_int(raw_value: String, fallback: int) -> int:
+	var trimmed: String = raw_value.strip_edges()
+	if trimmed.is_valid_int():
+		return trimmed.to_int()
 	return fallback
 
 func is_held_by(peer_id: int) -> bool:
@@ -524,6 +537,7 @@ func sync_state(next_transform: Transform3D, next_linear_velocity: Vector3, next
 
 func _apply_hold_collision_state() -> void:
 	var is_held: bool = not holder_paths.is_empty()
+	_sync_holder_collision_exceptions()
 	if is_held:
 		# Keep held cargo physically collidable so players can bump each other with it.
 		collision_layer = _default_collision_layer
@@ -575,7 +589,9 @@ func _prune_invalid_holders() -> bool:
 	return changed
 
 func _move_held_towards(target_position: Vector3, delta: float) -> void:
-	var alpha: float = min(1.0, delta * follow_lerp_speed)
+	var lag_distance: float = global_position.distance_to(target_position)
+	var catchup_speed: float = follow_lerp_speed + lag_distance * follow_catchup_distance_gain
+	var alpha: float = min(1.0, delta * catchup_speed)
 	var start_position: Vector3 = global_position
 	var desired_position: Vector3 = start_position.lerp(target_position, alpha)
 	var start_blocked: bool = _is_held_position_blocked(start_position)
@@ -656,6 +672,8 @@ func _is_held_position_blocked(candidate_position: Vector3) -> bool:
 		var collider: Object = hit.get("collider")
 		if collider == null:
 			continue
+		if _is_holder_player_body(collider):
+			continue
 		if collider is PlayerController:
 			return true
 		if collider is CargoCrate:
@@ -667,6 +685,49 @@ func _is_held_position_blocked(candidate_position: Vector3) -> bool:
 		if collider is StaticBody3D:
 			return true
 	return false
+
+func _sync_holder_collision_exceptions() -> void:
+	var next_bodies: Array[PhysicsBody3D] = _get_holder_player_bodies()
+
+	for body: PhysicsBody3D in _holder_collision_exceptions:
+		if body == null or not is_instance_valid(body):
+			continue
+		remove_collision_exception_with(body)
+		body.remove_collision_exception_with(self)
+
+	_holder_collision_exceptions.clear()
+	for body: PhysicsBody3D in next_bodies:
+		if body == null or not is_instance_valid(body):
+			continue
+		add_collision_exception_with(body)
+		body.add_collision_exception_with(self)
+		_holder_collision_exceptions.append(body)
+
+func _get_holder_player_bodies() -> Array[PhysicsBody3D]:
+	var bodies: Array[PhysicsBody3D] = []
+	for peer_key: Variant in holder_paths.keys():
+		var path: NodePath = holder_paths.get(peer_key, NodePath(""))
+		var player_body: PhysicsBody3D = _get_holder_player_body(path)
+		if player_body != null and not bodies.has(player_body):
+			bodies.append(player_body)
+	return bodies
+
+func _get_holder_player_body(path: NodePath) -> PhysicsBody3D:
+	if path.is_empty() or not has_node(path):
+		return null
+	var node: Node = get_node(path)
+	while node != null:
+		var player: PlayerController = node as PlayerController
+		if player != null:
+			return player
+		node = node.get_parent()
+	return null
+
+func _is_holder_player_body(obj: Object) -> bool:
+	var body: PhysicsBody3D = obj as PhysicsBody3D
+	if body == null:
+		return false
+	return _holder_collision_exceptions.has(body)
 
 func _update_ship_latch_state(delta: float) -> void:
 	var ship: SkyShip = _find_support_ship()
