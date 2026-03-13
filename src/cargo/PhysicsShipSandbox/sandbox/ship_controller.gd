@@ -1,12 +1,12 @@
 extends RigidBody3D
 
 @export_category("Drive")
-@export var thrust_force: float = 520.0
-@export var reverse_force: float = 300.0
+@export var thrust_force: float = 180.0
+@export var reverse_force: float = 110.0
 @export var strafe_force: float = 20.0
 @export var vertical_force: float = 55.0
-@export var linear_drag: float = 0.45
-@export var max_speed: float = 36.0
+@export var linear_drag: float = 0.8
+@export var max_speed: float = 7.5
 
 @export_category("Rotation")
 @export var yaw_torque: float = 14.0

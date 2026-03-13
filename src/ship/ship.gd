@@ -2,12 +2,12 @@ extends RigidBody3D
 class_name SkyShip
 
 @export_category("Drive")
-@export var thrust_force: float = 520.0
-@export var reverse_force: float = 300.0
-@export var linear_drag: float = 0.45
-@export var max_speed: float = 36.0
-@export var throttle_ramp_seconds: float = 1.6
-@export var forward_velocity_gain: float = 3.6
+@export var thrust_force: float = 180.0
+@export var reverse_force: float = 110.0
+@export var linear_drag: float = 0.8
+@export var max_speed: float = 7.5
+@export var throttle_ramp_seconds: float = 2.0
+@export var forward_velocity_gain: float = 0.9
 @export var side_slip_damp: float = 3.2
 @export var vertical_velocity_gain: float = 3.8
 @export var pitch_speed_to_climb: float = 1.0
