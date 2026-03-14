@@ -134,22 +134,19 @@ func _apply_ship_drive(delta: float) -> void:
 		if yaw_input == 0.0:
 			yaw_input = float(Input.is_key_pressed(KEY_E)) - float(Input.is_key_pressed(KEY_Q))
 	_yaw_input_current = yaw_input
-	# Keep throttle on W/S. Pitch is dedicated to arrows or I/K.
+	# Keep throttle on W/S. Pitch is dedicated to arrows or I/K, with I/K swapped.
 	var pitch_input_arrows: float = 0.0
 	var pitch_input_ik: float = 0.0
 	if _controls_enabled:
-		pitch_input_arrows = float(Input.is_key_pressed(KEY_DOWN)) - float(Input.is_key_pressed(KEY_UP))
-		pitch_input_ik = float(Input.is_key_pressed(KEY_K)) - float(Input.is_key_pressed(KEY_I))
+		pitch_input_arrows = float(Input.is_key_pressed(KEY_UP)) - float(Input.is_key_pressed(KEY_DOWN))
+		pitch_input_ik = float(Input.is_key_pressed(KEY_I)) - float(Input.is_key_pressed(KEY_K))
 	var pitch_input: float = pitch_input_arrows
 	if pitch_input == 0.0:
 		pitch_input = pitch_input_ik
 	var max_pitch_radians: float = deg_to_rad(max_pitch_tilt_degrees)
 	var forward_speed: float = max(0.0, linear_velocity.dot(forward))
 	var pitch_factor: float = clamp(forward_speed / pitch_speed_for_full_authority, 0.0, 1.0)
-	pitch_factor = max(pitch_factor, min_pitch_control_factor)
-	if throttle > 0.0:
-		pitch_factor = max(pitch_factor, min_pitch_factor_when_throttling)
-	# Momentum-scaled pitch control like turning.
+	# Pitch target changes only when the ship is actually moving forward.
 	_desired_pitch_radians += pitch_input * deg_to_rad(pitch_input_rate_degrees) * pitch_factor * delta
 	_desired_pitch_radians = clamp(_desired_pitch_radians, -max_pitch_radians, max_pitch_radians)
 
@@ -161,8 +158,8 @@ func _apply_ship_drive(delta: float) -> void:
 	var current_yaw_rate: float = angular_velocity.dot(yaw_axis)
 	var yaw_rate_error: float = desired_yaw_rate - current_yaw_rate
 	apply_torque(yaw_axis * yaw_rate_error * yaw_torque * mass)
-	# Optional feed-forward pitch torque (set low/zero for smoother target tracking).
-	apply_torque(global_basis.x * pitch_input * pitch_input_torque_boost * mass)
+	# Optional feed-forward pitch torque tracks the same motion gating as desired pitch.
+	apply_torque(global_basis.x * pitch_input * pitch_input_torque_boost * pitch_factor * mass)
 	apply_torque(-angular_velocity * angular_drag * mass)
 
 	if angular_velocity.length() > max_angular_speed:

@@ -520,9 +520,9 @@ func _apply_drive_control() -> void:
 	if ship == null:
 		return
 
-	# A/D steer trim latch. W/S pitch nose. Shift/Ctrl adjust throttle.
+	# A/D steer trim latch. W/S pitch nose (swapped). Shift/Ctrl adjust throttle.
 	var turn_input: float = Input.get_axis("move_left", "move_right")
-	var pitch_input: float = Input.get_axis("move_back", "move_forward")
+	var pitch_input: float = Input.get_axis("move_forward", "move_back")
 	var accelerating: bool = Input.is_action_pressed("ship_accelerate")
 	var decelerating: bool = Input.is_action_pressed("ship_decelerate")
 	ship.submit_driver_input(turn_input, pitch_input, accelerating, decelerating)

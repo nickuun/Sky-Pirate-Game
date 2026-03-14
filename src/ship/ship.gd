@@ -238,10 +238,8 @@ func _apply_ship_drive(delta: float) -> void:
 	var pitch_input: float = _driver_pitch_input if driver_peer_id != 0 else 0.0
 	var steering_speed: float = max(abs(desired_forward_speed), max(0.0, current_forward_speed))
 
-	var pitch_factor: float = clamp(steering_speed / pitch_speed_for_full_authority, 0.0, 1.0)
-	pitch_factor = max(pitch_factor, min_pitch_control_factor)
-	if throttle > 0.0:
-		pitch_factor = max(pitch_factor, min_pitch_factor_when_throttling)
+	var pitch_control_speed: float = max(0.0, current_forward_speed)
+	var pitch_factor: float = clamp(pitch_control_speed / pitch_speed_for_full_authority, 0.0, 1.0)
 	_desired_pitch_radians += pitch_input * deg_to_rad(pitch_input_rate_degrees) * pitch_factor * delta
 	_desired_pitch_radians = clamp(
 		_desired_pitch_radians,
@@ -258,7 +256,7 @@ func _apply_ship_drive(delta: float) -> void:
 	var yaw_rate_error: float = desired_yaw_rate - current_yaw_rate
 	apply_torque(yaw_axis * yaw_rate_error * yaw_torque * mass)
 
-	apply_torque(global_basis.x * pitch_input * pitch_input_torque_boost * mass)
+	apply_torque(global_basis.x * pitch_input * pitch_input_torque_boost * pitch_factor * mass)
 	apply_torque(-angular_velocity * angular_drag * mass)
 
 	if angular_velocity.length() > max_angular_speed:
