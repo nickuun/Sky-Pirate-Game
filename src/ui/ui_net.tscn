@@ -9,67 +9,121 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
+mouse_filter = 1
 script = ExtResource("1_w4sg8")
 
 [node name="Panel" type="PanelContainer" parent="."]
-layout_mode = 0
-offset_left = 18.0
-offset_top = 17.0
-offset_right = 342.0
-offset_bottom = 334.0
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -210.0
+offset_top = -190.0
+offset_right = 210.0
+offset_bottom = 190.0
 
 [node name="Margin" type="MarginContainer" parent="Panel"]
 layout_mode = 2
-theme_override_constants/margin_left = 10
-theme_override_constants/margin_top = 10
-theme_override_constants/margin_right = 10
-theme_override_constants/margin_bottom = 10
+theme_override_constants/margin_left = 18
+theme_override_constants/margin_top = 18
+theme_override_constants/margin_right = 18
+theme_override_constants/margin_bottom = 18
 
 [node name="VBox" type="VBoxContainer" parent="Panel/Margin"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 14
 
-[node name="Title" type="Label" parent="Panel/Margin/VBox"]
+[node name="TitleBlock" type="VBoxContainer" parent="Panel/Margin/VBox"]
 layout_mode = 2
-text = "Sky Pirate Session"
+theme_override_constants/separation = 4
 
-[node name="Buttons" type="HBoxContainer" parent="Panel/Margin/VBox"]
+[node name="Title" type="Label" parent="Panel/Margin/VBox/TitleBlock"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_font_sizes/font_size = 26
+text = "Sky Pirate"
 
-[node name="SingleplayerButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+[node name="Subtitle" type="Label" parent="Panel/Margin/VBox/TitleBlock"]
 layout_mode = 2
-size_flags_horizontal = 3
+modulate = Color(0.84, 0.88, 1, 0.88)
+text = "Choose how you want to set sail."
+
+[node name="LandingMenu" type="VBoxContainer" parent="Panel/Margin/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SingleplayerButton" type="Button" parent="Panel/Margin/VBox/LandingMenu"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
 text = "Singleplayer"
 
-[node name="HostButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+[node name="MultiplayerButton" type="Button" parent="Panel/Margin/VBox/LandingMenu"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Multiplayer"
+
+[node name="QuitButton" type="Button" parent="Panel/Margin/VBox/LandingMenu"]
+custom_minimum_size = Vector2(0, 44)
+layout_mode = 2
+text = "Quit"
+
+[node name="MultiplayerMenu" type="VBoxContainer" parent="Panel/Margin/VBox"]
+visible = false
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TopRow" type="HBoxContainer" parent="Panel/Margin/VBox/MultiplayerMenu"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BackButton" type="Button" parent="Panel/Margin/VBox/MultiplayerMenu/TopRow"]
+custom_minimum_size = Vector2(84, 36)
+layout_mode = 2
+text = "Back"
+
+[node name="Spacer" type="Control" parent="Panel/Margin/VBox/MultiplayerMenu/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ActionsRow" type="HBoxContainer" parent="Panel/Margin/VBox/MultiplayerMenu"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="HostButton" type="Button" parent="Panel/Margin/VBox/MultiplayerMenu/ActionsRow"]
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Host"
 
-[node name="RefreshButton" type="Button" parent="Panel/Margin/VBox/Buttons"]
+[node name="RefreshButton" type="Button" parent="Panel/Margin/VBox/MultiplayerMenu/ActionsRow"]
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "Refresh"
 
-[node name="HostsList" type="ItemList" parent="Panel/Margin/VBox"]
-custom_minimum_size = Vector2(0, 140)
+[node name="HostsList" type="ItemList" parent="Panel/Margin/VBox/MultiplayerMenu"]
+custom_minimum_size = Vector2(0, 150)
 layout_mode = 2
 
-[node name="JoinRow" type="HBoxContainer" parent="Panel/Margin/VBox"]
+[node name="JoinRow" type="HBoxContainer" parent="Panel/Margin/VBox/MultiplayerMenu"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 8
 
-[node name="IPInput" type="LineEdit" parent="Panel/Margin/VBox/JoinRow"]
+[node name="IPInput" type="LineEdit" parent="Panel/Margin/VBox/MultiplayerMenu/JoinRow"]
+custom_minimum_size = Vector2(0, 38)
 layout_mode = 2
 size_flags_horizontal = 3
 placeholder_text = "Type IP if no list entry..."
 
-[node name="JoinButton" type="Button" parent="Panel/Margin/VBox/JoinRow"]
+[node name="JoinButton" type="Button" parent="Panel/Margin/VBox/MultiplayerMenu/JoinRow"]
+custom_minimum_size = Vector2(84, 38)
 layout_mode = 2
 text = "Join"
 
-[node name="Status" type="Label" parent="Panel/Margin/VBox"]
+[node name="Status" type="Label" parent="Panel/Margin/VBox/MultiplayerMenu"]
 layout_mode = 2
 autowrap_mode = 3
-text = "Pick singleplayer or host/join LAN."
+modulate = Color(0.94, 0.96, 1, 0.9)
+text = "Select a host or type an IP."

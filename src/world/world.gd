@@ -29,6 +29,7 @@ func _ready() -> void:
 	Network.server_started.connect(_on_session_started)
 	Network.connected_to_server.connect(_on_session_started)
 	Network.disconnected.connect(_on_session_disconnected)
+	Network.session_active_changed.connect(_on_session_active_changed)
 
 	# In case the world starts after a multiplayer session already exists.
 	_on_session_started()
@@ -78,11 +79,15 @@ func _on_session_started() -> void:
 		return
 	if multiplayer.is_server():
 		_spawn_player(multiplayer.get_unique_id())
+	_update_sell_count_label()
 
 func _on_session_disconnected() -> void:
 	for child: Node in players_root.get_children():
 		child.queue_free()
 	_sold_cargo_value_total = 0
+	_update_sell_count_label()
+
+func _on_session_active_changed(_active: bool) -> void:
 	_update_sell_count_label()
 
 func restart_world() -> void:
@@ -291,4 +296,5 @@ func _setup_sell_count_label() -> void:
 func _update_sell_count_label() -> void:
 	if _sold_count_label == null:
 		return
+	_sold_count_label.visible = Network.session_active
 	_sold_count_label.text = "Gold: %d" % _sold_cargo_value_total
