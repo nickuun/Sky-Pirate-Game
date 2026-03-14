@@ -10,6 +10,8 @@ height = 1.0
 [node name="Player" type="CharacterBody3D" unique_id=45355869]
 collision_mask = 11
 script = ExtResource("1_4anbu")
+move_speed = 5.0
+jump_velocity = 4.5
 
 [node name="CapsuleShape3D" type="CollisionShape3D" parent="." unique_id=1096113231]
 shape = SubResource("CapsuleShape3D_rxibo")

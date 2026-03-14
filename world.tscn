@@ -83,6 +83,24 @@ transform = Transform3D(0.99999994, 0, 0, 0, 0.99999994, 0, 0, 0, 0.99999994, 0,
 mesh = SubResource("BoxMesh_gv5m4")
 surface_material_override/0 = SubResource("StandardMaterial3D_ground")
 
+[node name="CollisionShape3D2" type="CollisionShape3D" parent="Ground" unique_id=531426119]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999998, 0, 0, 0, 0.9999998, -1.0000263, 2.1468227, 0)
+shape = SubResource("BoxShape3D_f3sb7")
+
+[node name="MeshInstance3D2" type="MeshInstance3D" parent="Ground" unique_id=1308514489]
+transform = Transform3D(0.9999998, 0, 0, 0, 0.9999998, 0, 0, 0, 0.9999998, -0.9985107, 2.1468227, 0)
+mesh = SubResource("BoxMesh_gv5m4")
+surface_material_override/0 = SubResource("StandardMaterial3D_ground")
+
+[node name="CollisionShape3D3" type="CollisionShape3D" parent="Ground" unique_id=1643123526]
+transform = Transform3D(0.99999976, 0, 0, 0, 0.99999976, 0, 0, 0, 0.99999976, -0.9985107, 2.1468225, 0.98573977)
+shape = SubResource("BoxShape3D_f3sb7")
+
+[node name="MeshInstance3D3" type="MeshInstance3D" parent="Ground" unique_id=1819856866]
+transform = Transform3D(0.99999976, 0, 0, 0, 0.99999976, 0, 0, 0, 0.99999976, -0.9985107, 2.1468225, 0.98573977)
+mesh = SubResource("BoxMesh_gv5m4")
+surface_material_override/0 = SubResource("StandardMaterial3D_ground")
+
 [node name="Ground2" type="StaticBody3D" parent="." unique_id=433012088]
 transform = Transform3D(15, 0, 0, 0, 15, 0, 0, 0, 15, 0.6442001, -2.8369308, -62.150257)
 
@@ -106,9 +124,11 @@ surface_material_override/0 = SubResource("StandardMaterial3D_ground")
 
 [node name="SkyShip" parent="." unique_id=553199057 instance=ExtResource("5_pk5m8")]
 transform = Transform3D(-0.9967302, -0.0077097546, 0.08043206, -0.0025111286, 0.99791217, 0.0645357, -0.08076166, 0.06412275, -0.99466866, -2.6151295, 30.490217, 10.7547455)
+center_of_mass = Vector3(0, -1.6, 0)
 
 [node name="SkyShip2" parent="." unique_id=2054720719 instance=ExtResource("5_pk5m8")]
 transform = Transform3D(-0.99999243, -0.0026988983, 0.002822563, -0.002511129, 0.99791217, 0.0645357, -0.002990827, 0.06452817, -0.9979115, 5.7900057, 30.490217, 10.7547455)
+center_of_mass = Vector3(0, -1.6, 0)
 
 [node name="CargoCrate" parent="." unique_id=1588129755 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 2.0292387, 33.306114, -5.178396)
@@ -132,7 +152,6 @@ cargo_type_id = &"cube_large"
 
 [node name="CargoCrate8" parent="." unique_id=824075693 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.297634, 8.2301445, -63.079105)
-cargo_type_id = &"cube_small"
 
 [node name="CargoCrate9" parent="." unique_id=460895709 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 58.297634, 9.640003, -62.63021)
@@ -148,7 +167,6 @@ cargo_type_id = &"cylinder_small"
 
 [node name="CargoCrate11" parent="." unique_id=1960825041 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2183726, 34.762157, 10.705931)
-cargo_type_id = &"cube_small"
 
 [node name="CargoCrate12" parent="." unique_id=67571828 instance=ExtResource("3_y3hkc")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -2.2183726, 36.8791, 10.705931)
